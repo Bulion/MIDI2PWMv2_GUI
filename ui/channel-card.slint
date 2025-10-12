@@ -1,0 +1,200 @@
+import { Gauge } from "gauge.slint";
+import { LinearGauge } from "linear-gauge.slint";
+
+component Card inherits Rectangle {
+    in property <string> note: "E#";
+    in property <float> voltage: 20.0;
+    in property <float> current: 2300.0;
+
+    border-top-left-radius: 20px;
+    border-top-right-radius: 20px;
+    background: #25282d;
+    border-width: 1px;
+    border-color: #404041;
+
+    note_label := Text {
+        text: note;
+        color: #ccc;
+        font-size: 24px;
+        horizontal-alignment: center;
+        y: 5px;
+        width: parent.width;
+    }
+
+    HorizontalLayout {
+        width: parent.width;
+        y: note_label.y + note_label.height + 5px;
+        padding: 5px;
+        spacing: 10px;
+
+        Gauge {
+            stroke_width: 4px;
+            width: 40px;
+            height: 40px;
+            min_value: 0.0;
+            max_value: 36.0;
+            value_precision: 1;
+            value: voltage;
+            unit: "V";
+        }
+
+        Gauge {
+            stroke_width: 4px;
+            width: 40px;
+            height: 40px;
+            min_value: 0.0;
+            max_value: 4000.0;
+            value: current;
+            unit: "mA";
+        }
+    }
+
+    VerticalLayout {
+        height: 50px;
+        y: parent.height - self.height;
+        spacing: 10px;
+
+        LinearGauge {
+            x: 5px;
+            width: parent.width - 2 * self.x;
+            height: 10px;
+            min_value: 0.0;
+            max_value: 100.0;
+            value: voltage / 36.0 * 100.0;
+            middle_value: 20.0;
+            flip: false;
+            track_color: #ddd;
+            fill_color: #3399ff;
+            middle_color: #ff8800;
+        }
+
+        HorizontalLayout {
+            width: parent.width;
+            for i in 4: Rectangle {
+                width: parent.width / 4;
+                background: (i == 0 || i == 3) ? #d87300 : #404041;
+                border-top-left-radius: 10px;
+                border-top-right-radius: 10px;
+                border-width: 1px;
+                border-color: #b4b4b4;
+            }
+        }
+    }
+}
+
+component InvertedCard inherits Rectangle {
+    in property <string> note: "E#";
+    in property <float> voltage: 20.0;
+    in property <float> current: 2300.0;
+
+    border-bottom-left-radius: 20px;
+    border-bottom-right-radius: 20px;
+    background: #25282d;
+    border-width: 1px;
+    border-color: #404041;
+
+    note_label := Text {
+        text: note;
+        color: #ccc;
+        font-size: 24px;
+        horizontal-alignment: center;
+        y: parent.height - self.height - 5px;
+        width: parent.width;
+    }
+
+    HorizontalLayout {
+        width: parent.width;
+        height: 40px;
+        y: note_label.y - self.height - 10px;
+        padding: 5px;
+        spacing: 10px;
+
+        Gauge {
+            stroke_width: 4px;
+            width: 40px;
+            height: parent.height;
+            min_value: 0.0;
+            max_value: 4000.0;
+            value: current;
+            unit: "mA";
+            rotation: 180deg;
+        }
+
+        Gauge {
+            stroke_width: 4px;
+            width: 40px;
+            height: parent.height;
+            min_value: 0.0;
+            max_value: 36.0;
+            value_precision: 1;
+            value: voltage;
+            unit: "V";
+            rotation: 180deg;
+        }
+    }
+
+    VerticalLayout {
+        height: 50px;
+        y: 0px;
+        spacing: 10px;
+
+        HorizontalLayout {
+            width: parent.width;
+            for i in 4: Rectangle {
+                width: parent.width / 4;
+                background: (i == 0 || i == 3) ? #d87300 : #404041;
+                border-bottom-left-radius: 10px;
+                border-bottom-right-radius: 10px;
+                border-width: 1px;
+                border-color: #b4b4b4;
+            }
+        }
+
+        LinearGauge {
+            x: 5px;
+            width: parent.width - 2 * self.x;
+            height: 10px;
+            min_value: 0.0;
+            max_value: 100.0;
+            value: voltage / 36.0 * 100.0;
+            middle_value: 20.0;
+            flip: true;
+            track_color: #ddd;
+            fill_color: #3399ff;
+            middle_color: #ff8800;
+        }
+    }
+}
+
+export component ChannelCard {
+    in property <string> note: "E#";
+    in property <float> voltage: 20.0;
+    in property <float> current: 2300.0;
+    in property <bool> invert: false;
+    callback clicked;
+
+    width: 100px;
+    height: 150px;
+
+    TouchArea {
+        width: parent.width;
+        height: parent.height;
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    InvertedCard {
+        visible: root.invert;
+        note: root.note;
+        voltage: root.voltage;
+        current: root.current;
+    }
+
+    Card {
+        visible: !root.invert;
+        note: root.note;
+        voltage: root.voltage;
+        current: root.current;
+    }
+}

@@ -1,0 +1,58 @@
+export component LinearGauge {
+    in property <float> min_value: 0.0;
+    in property <float> max_value: 100.0;
+    in property <float> value: 50.0;
+    in property <float> middle_value: 50.0;
+    in property <bool> flip: false;
+    in property <brush> track_color: #ddd;
+    in property <brush> fill_color: #3399ff;
+    in property <brush> middle_color: #ff8800;
+    in property <length> gauge_height: 8px;
+    in property <length> middle_line_width: 4px;
+
+    private property <float> norm_value: Math.max(0, Math.min(1, (root.value - root.min_value) / Math.max(0.0001, root.max_value - root.min_value)));
+    private property <float> norm_middle: Math.max(0, Math.min(1, (root.middle_value - root.min_value) / Math.max(0.0001, root.max_value - root.min_value)));
+    private property <float> value_t: root.flip ? 1.0 - norm_value : norm_value;
+    private property <float> middle_t: root.flip ? 1.0 - norm_middle : norm_middle;
+    private property <length> center_y: self.height / 2;
+    private property <length> value_x: self.width * value_t;
+    private property <length> middle_x: self.width * middle_t;
+    private property <length> fill_left: Math.min(value_x, middle_x);
+    private property <length> fill_right: Math.max(value_x, middle_x);
+    private property <bool> show_middle: root.middle_value > root.min_value && root.middle_value < root.max_value;
+    private property <bool> round_left: ((root.flip ? root.value < root.middle_value : root.value > root.middle_value) || !show_middle);
+    private property <bool> round_right: ((root.flip ? root.value > root.middle_value : root.value < root.middle_value) || !show_middle);
+
+    Rectangle {
+        x: 0px;
+        y: center_y - root.gauge_height / 2;
+        width: parent.width;
+        height: root.gauge_height;
+        background: root.track_color;
+        border-radius: root.gauge_height / 2;
+        opacity: 0.8;
+    }
+
+    Rectangle {
+        x: fill_left;
+        y: center_y - root.gauge_height / 2;
+        width: fill_right - fill_left;
+        height: root.gauge_height;
+        background: root.fill_color;
+        border-top-left-radius: round_left ? root.gauge_height / 2 : 0px;
+        border-bottom-left-radius: round_left ? root.gauge_height / 2 : 0px;
+        border-top-right-radius: round_right ? root.gauge_height / 2 : 0px;
+        border-bottom-right-radius: round_right ? root.gauge_height / 2 : 0px;
+        opacity: 1.0;
+    }
+
+    Rectangle {
+        x: middle_x - root.middle_line_width / 2;
+        y: center_y - root.gauge_height * 1.5 / 2;
+        width: root.middle_line_width;
+        height: root.gauge_height * 1.5;
+        background: root.middle_color;
+        border-radius: root.middle_line_width / 2;
+        opacity: show_middle ? 1.0 : 0.0;
+    }
+}

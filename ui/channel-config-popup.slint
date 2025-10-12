@@ -1,0 +1,161 @@
+import { Button, SpinBox, Slider } from "std-widgets.slint";
+
+component ValueConfig inherits HorizontalLayout {
+    in-out property <string> property_name: "Value";
+    in-out property <float> min_value: 0.0;
+    in-out property <float> max_value: 100.0;
+    in-out property <float> middle_value: 50.0;
+
+    spacing: 10px;
+    height: 30px;
+
+    Text {
+        text: property_name;
+        color: #bbb;
+        vertical-alignment: center;
+        width: 45px;
+    }
+
+    Slider {
+        value: root.min_value;
+        minimum: -100.0;
+        maximum: root.middle_value - 0.1;
+        changed(value) => {
+            root.min_value = value;
+        }
+    }
+
+    SpinBox {
+        width: 110px;
+        value: root.min_value;
+        minimum: -100.0;
+        maximum: root.middle_value - 0.1;
+        edited(value) => {
+            root.min_value = value;
+        }
+    }
+}
+
+export component ChannelConfigPopup inherits Rectangle {
+    in-out property <string> note: "";
+    in-out property <float> min_value: 0.0;
+    in-out property <float> max_value: 0.0;
+    in-out property <float> middle_value: 0.0;
+    in-out property <string> fault: "";
+    callback assign_note;
+    callback reset_note;
+    callback reset_fault;
+    callback close;
+
+    width: 600px;
+    height: 320px;
+    background: #232323;
+    border-radius: 12px;
+    border-width: 2px;
+    border-color: #aaa;
+
+    TouchArea {
+        x: 0px;
+        y: 0px;
+        width: parent.width;
+        height: parent.height;
+    }
+
+    Button {
+        text: "X";
+        width: 36px;
+        height: 36px;
+        x: parent.width - self.width - 8px;
+        y: 8px;
+
+        clicked => {
+            root.close();
+        }
+    }
+
+    Text {
+        text: "Configure Channel";
+        font-size: 22px;
+        color: #fff;
+        horizontal-alignment: center;
+        y: 12px;
+        width: parent.width;
+    }
+
+    HorizontalLayout {
+        spacing: 32px;
+        y: 56px;
+        width: parent.width;
+        height: parent.height - self.y - 16px;
+        padding: 24px;
+
+        VerticalLayout {
+            spacing: 18px;
+            width: 240px;
+
+            Text {
+                text: "Note: " + root.note;
+                color: #eee;
+                font-size: 18px;
+            }
+
+            HorizontalLayout {
+                spacing: 10px;
+                Button {
+                    text: "Assign New Note";
+                    clicked => {
+                        root.assign_note();
+                    }
+                }
+
+                Button {
+                    text: "Reset Note";
+                    width: 88px;
+                    clicked => {
+                        root.reset_note();
+                    }
+                }
+            }
+
+            Text {
+                text: "Fault: " + (root.fault == "" ? "None" : root.fault);
+                color: root.fault == "" ? #0f0 : #f66;
+                font-size: 16px;
+            }
+
+            Button {
+                text: "Reset Fault";
+                enabled: root.fault != "";
+                clicked => {
+                    root.reset_fault();
+                }
+                width: 100px;
+            }
+        }
+
+        VerticalLayout {
+            spacing: 5px;
+
+            ValueConfig {
+                property_name: "Min:";
+                min_value: -100.0;
+                max_value: root.middle_value - 0.1;
+                middle_value: root.min_value;
+            }
+
+            ValueConfig {
+                property_name: "Middle:";
+                min_value: root.min_value + 0.1;
+                max_value: root.max_value - 0.1;
+                middle_value: root.middle_value;
+            }
+
+            ValueConfig {
+                property_name: "Max:";
+                min_value: root.middle_value + 0.1;
+                max_value: 100.0;
+                middle_value: root.max_value;
+            }
+        }
+    }
+}

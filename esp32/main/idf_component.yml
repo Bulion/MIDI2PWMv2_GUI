@@ -1,0 +1,8 @@
+## IDF Component Manager Manifest File
+dependencies:
+  ## Required IDF version
+  idf:
+    version: ">=5.0.0"
+  slint/slint: 1.12.1
+  espressif/tinyusb: 0.18.0~3
+  espressif/esp_lcd_touch_gt911: ==1.1.1

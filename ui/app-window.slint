@@ -1,0 +1,122 @@
+import { VerticalBox, AboutSlint } from "std-widgets.slint";
+import { ChannelCard } from "channel-card.slint";
+import { ChannelConfigPopup } from "channel-config-popup.slint";
+
+export struct ChannelData {
+    note: string,
+    voltage: float,
+    current: float,
+    min_value: float,
+    max_value: float,
+    middle_value: float,
+    fault: string,
+}
+
+export component AppWindow inherits Window {
+    width: 800px;
+    height: 480px;
+    background: #1a1d21;
+
+    in-out property <string> midi_message: "No midi message received yet";
+
+    in-out property <[ChannelData]> channel_model: [
+        { note: "C4", voltage: 12.3, current: 1300.0 },
+        { note: "D4", voltage: 15.0, current: 1500.0 },
+        { note: "E4", voltage: 20.0, current: 2000.0 },
+        { note: "E4", voltage: 20.0, current: 2000.0 },
+        { note: "E4", voltage: 20.0, current: 2000.0 },
+        { note: "E4", voltage: 20.0, current: 2000.0 },
+        { note: "E4", voltage: 20.0, current: 2000.0 },
+        { note: "E4", voltage: 20.0, current: 2000.0 },
+        { note: "E4", voltage: 20.0, current: 2000.0 },
+        { note: "E4", voltage: 20.0, current: 2000.0 },
+        { note: "E4", voltage: 20.0, current: 2000.0 },
+        { note: "E4", voltage: 20.0, current: 2000.0 },
+        { note: "E4", voltage: 20.0, current: 2000.0 },
+        { note: "E4", voltage: 20.0, current: 2000.0 },
+        { note: "E4", voltage: 20.0, current: 2000.0 },
+        { note: "F4", voltage: 25.0, current: 2500.0 }
+    ];
+
+    private property <bool> show_popup: false;
+
+    private property <string> temp_note: "";
+    private property <float> temp_min: 0.0;
+    private property <float> temp_max: 0.0;
+    private property <float> temp_middle: 0.0;
+    private property <string> temp_fault: "";
+
+    in property <length> card_width: 100px;
+    in property <length> card_height: 150px;
+
+    Text {
+        text: root.midi_message;
+    }
+
+    for i in 16: ChannelCard {
+        private property <int> row_count: i < 8 ? 1 : 0;
+        private property <int> col_count: row_count == 1 ? Math.mod(i, 8) : 7 - Math.mod(i, 8);
+
+        clicked => {
+            root.show_popup = true;
+            root.temp_note = root.channel_model[i].note;
+            root.temp_min = root.channel_model[i].min_value;
+            root.temp_max = root.channel_model[i].max_value;
+            root.temp_middle = root.channel_model[i].middle_value;
+            root.temp_fault = root.channel_model[i].fault;
+        }
+
+        x: col_count * card_width;
+        y: row_count == 1 ? parent.height - card_height : 0px;
+        width: card_width;
+        height: card_height;
+        note: root.channel_model.length > i ? root.channel_model[i].note : "";
+        voltage: root.channel_model.length > i ? root.channel_model[i].voltage : 0.0;
+        current: root.channel_model.length > i ? root.channel_model[i].current : 0.0;
+        invert: row_count == 0;
+    }
+
+    Rectangle {
+        visible: show_popup;
+        z: 100;
+        x: 0px;
+        y: 0px;
+        width: parent.width;
+        height: parent.height;
+        background: #000a;
+
+        TouchArea {
+            x: 0px;
+            y: 0px;
+            width: parent.width;
+            height: parent.height;
+            clicked => {
+                show_popup = false;
+            }
+        }
+
+        ChannelConfigPopup {
+            note: root.temp_note;
+            min_value: root.temp_min;
+            max_value: root.temp_max;
+            middle_value: root.temp_middle;
+            fault: root.temp_fault;
+
+            // Callbacks for button actions
+            assign_note => {
+                // Example: open keyboard, assign new note, etc.
+                // For now, just set to a test value
+                root.temp_note = "NEW_NOTE";
+            }
+            reset_note => {
+                root.temp_note = "";
+            }
+            reset_fault => {
+                root.temp_fault = "";
+            }
+            close => {
+                show_popup = false;
+            }
+        }
+    }
+}

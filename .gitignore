@@ -1,0 +1,33 @@
+# Build directories
+/build/
+/esp32/build/
+/desktop/build/
+/web/build/
+
+# CMake-generated files
+/CMakeCache.txt
+/CMakeFiles/
+/cmake_install.cmake
+/Makefile
+
+# Rust/Slint FetchContent artifacts
+/_deps/
+
+# ESP-IDF/managed component locks & configs (generated)
+/esp32/managed_components
+/esp32/dependencies.lock
+/esp32/sdkconfig
+/esp32/sdkconfig.old
+
+# Node.js artefacts for web backend
+/web/node_modules/
+/web/package-lock.json
+/web/pnpm-lock.yaml
+/web/yarn.lock
+/web/dist/
+/web/generated/
+
+# IDE and tooling metadata
+/.idea/
+.vscode/
+.DS_Store
