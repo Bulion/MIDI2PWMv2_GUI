@@ -1,13 +1,17 @@
+set(LIBCOMM_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../../libcomm ${CMAKE_BINARY_DIR}/libcomm-esp32)
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../../common ${CMAKE_BINARY_DIR}/gui_common-esp32)
+
 idf_component_register(
-    SRCS 
+    SRCS
         "main.cpp"
         "waveshare_rgb_lcd_port.cpp"
-    PRIV_REQUIRES driver usb
-    INCLUDE_DIRS 
+        "uart_backend.cpp"
+    PRIV_REQUIRES driver
+    INCLUDE_DIRS
         "."
     REQUIRES
         slint
-        tinyusb
 )
 
 set(GUI_UI_DIR "${CMAKE_CURRENT_LIST_DIR}/../../ui")
@@ -17,17 +21,6 @@ slint_target_sources(
         ${GUI_UI_DIR}/app-window.slint
 )
 
-idf_component_get_property(tusb_lib espressif__tinyusb COMPONENT_LIB)
-idf_component_get_property(tinyusb_src_dir espressif__tinyusb COMPONENT_DIR)
-target_sources(
-    ${tusb_lib} 
-        PRIVATE
-            "${tinyusb_src_dir}/src/portable/synopsys/dwc2/hcd_dwc2.c"
-            "${tinyusb_src_dir}/src/host/usbh.c"
-            "${tinyusb_src_dir}/src/host/hub.c"
-            "${tinyusb_src_dir}/src/class/midi/midi_host.c"
-            "${tinyusb_src_dir}/src/class/vendor/vendor_host.c"
-)
-target_include_directories(${tusb_lib} PUBLIC tinyusb_config)
+target_link_libraries(${COMPONENT_LIB} PRIVATE gui_common)
 
     

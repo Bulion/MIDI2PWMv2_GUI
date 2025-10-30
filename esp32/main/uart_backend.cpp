@@ -1,7 +1,7 @@
 #include "uart_backend.h"
 
+#include "gui_common/log.h"
 #include "driver/uart.h"
-
 #include "etl/array.h"
 
 namespace gui::esp32
@@ -59,19 +59,24 @@ bool UartBackend::connect([[maybe_unused]] const std::string &portIdentifier)
 
     constexpr int NO_TRANSMIT_BUFFER = 0;
     constexpr int NO_EVENT_QUEUE = 0;
-    bool driverInstallationSucceeded = (uart_driver_install(kUartPort, kBufferSize, NO_TRANSMIT_BUFFER, NO_EVENT_QUEUE, nullptr, 0) == ESP_OK);
+    bool driverInstallationSucceeded =
+        (uart_driver_install(kUartPort, kBufferSize, NO_TRANSMIT_BUFFER, NO_EVENT_QUEUE, nullptr, 0) == ESP_OK);
     if (!driverInstallationSucceeded) {
+        GUI_LOG_ERROR("UartBackend", "Failed to install UART driver");
         return false;
     }
 
     bool parameterConfigurationSucceeded = (uart_param_config(kUartPort, &uartConfiguration) == ESP_OK);
     if (!parameterConfigurationSucceeded) {
+        GUI_LOG_ERROR("UartBackend", "Failed to configure UART parameters");
         uart_driver_delete(kUartPort);
         return false;
     }
 
-    bool pinConfigurationSucceeded = (uart_set_pin(kUartPort, kTxPin, kRxPin, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE) == ESP_OK);
+    bool pinConfigurationSucceeded =
+        (uart_set_pin(kUartPort, kTxPin, kRxPin, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE) == ESP_OK);
     if (!pinConfigurationSucceeded) {
+        GUI_LOG_ERROR("UartBackend", "Failed to configure UART pins");
         uart_driver_delete(kUartPort);
         return false;
     }
@@ -140,6 +145,7 @@ bool UartBackend::startFreeRtosReaderTask()
 
     bool taskCreationSucceeded = (taskCreationResult == pdPASS);
     if (!taskCreationSucceeded) {
+        GUI_LOG_ERROR("UartBackend", "Failed to create UART reader task");
         readerTaskHandle_ = nullptr;
         uart_driver_delete(kUartPort);
         readerTaskIsRunning_ = false;

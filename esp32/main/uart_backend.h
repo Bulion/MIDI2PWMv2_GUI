@@ -3,10 +3,9 @@
 #include "gui_common/backends/connection_backend.h"
 
 #include <atomic>
-#include <mutex>
-
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <mutex>
 
 namespace gui::esp32
 {
