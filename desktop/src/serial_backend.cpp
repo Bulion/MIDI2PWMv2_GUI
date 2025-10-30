@@ -1,75 +1,32 @@
 #include "serial_backend.h"
 
-#include <cerrno>
-#include <chrono>
-#include <filesystem>
-#include <fcntl.h>
-#include <termios.h>
-#include <thread>
-#include <unistd.h>
-#include <utility>
-#include <string>
-
-#include <cctype>
-
-#include "etl/algorithm.h"
+#include "CSerialPort/SerialPort.h"
+#include "CSerialPort/SerialPortInfo.h"
 #include "etl/array.h"
+#include "gui_common/log.h"
+
+#include <chrono>
+#include <thread>
 
 namespace gui::desktop
 {
 
+constexpr int kPreferredBaudRate = 921600;
+constexpr int kReadTimeoutMilliseconds = 100;
+
 namespace
 {
 
-constexpr const char *kDeviceDirectory = "/dev";
-
-bool containsOnlyDigitsAfterOffset(const std::string &deviceName, std::size_t startOffset)
+std::string getFriendlyDeviceName(const std::string &hardwareId, const std::string &defaultDescription)
 {
-    bool offsetIsOutOfBounds = (startOffset >= deviceName.size());
-    if (offsetIsOutOfBounds) {
-        return false;
+    if (hardwareId == "cafe:4002" || hardwareId == "cafe:4004") {
+        return "MIDI2PWM Device";
     }
 
-    auto startIterator = deviceName.begin() + static_cast<std::ptrdiff_t>(startOffset);
-    auto isCharacterADigit = [](unsigned char character) { return std::isdigit(character) != 0; };
-
-    return etl::all_of(startIterator, deviceName.end(), isCharacterADigit);
+    return defaultDescription;
 }
 
-bool isAllowedSerialDeviceForEnumeration(const std::string &deviceName)
-{
-    constexpr size_t TTY_PREFIX_START_POSITION = 0;
-    constexpr const char *TTY_DEVICE_PREFIX = "tty";
-    bool deviceNameStartsWithTty = (deviceName.rfind(TTY_DEVICE_PREFIX, TTY_PREFIX_START_POSITION) == TTY_PREFIX_START_POSITION);
-
-    if (!deviceNameStartsWithTty) {
-        return false;
-    }
-
-    constexpr const char *LEGACY_SERIAL_PORT_PREFIX = "ttyS";
-    constexpr size_t LEGACY_SERIAL_PORT_NUMBER_OFFSET = 4;
-    bool isLegacySerialPortWithNumber = (deviceName.rfind(LEGACY_SERIAL_PORT_PREFIX, TTY_PREFIX_START_POSITION) == TTY_PREFIX_START_POSITION)
-                                        && containsOnlyDigitsAfterOffset(deviceName, LEGACY_SERIAL_PORT_NUMBER_OFFSET);
-    if (isLegacySerialPortWithNumber) {
-        return false;
-    }
-
-    constexpr size_t GENERIC_TTY_NUMBER_OFFSET = 3;
-    bool isGenericTtyWithOnlyNumbers = containsOnlyDigitsAfterOffset(deviceName, GENERIC_TTY_NUMBER_OFFSET);
-    if (isGenericTtyWithOnlyNumbers) {
-        return false;
-    }
-
-    return true;
-}
-
-#ifdef B921600
-constexpr speed_t kPreferredBaud = B921600;
-#else
-constexpr speed_t kPreferredBaud = B115200;
-#endif
-
-} // namespace
+} // anonymous namespace
 
 SerialBackend::SerialBackend() = default;
 
@@ -78,32 +35,49 @@ SerialBackend::~SerialBackend()
     disconnect();
 }
 
-std::vector<std::string> SerialBackend::refreshPorts()
+std::vector<gui::common::PortInfo> SerialBackend::refreshPorts()
 {
-    std::vector<std::string> availableSerialPortPaths;
+    std::vector<gui::common::PortInfo> availablePortInfos;
 
     try {
-        for (const auto &deviceFileEntry : std::filesystem::directory_iterator(kDeviceDirectory)) {
-            bool entryIsCharacterDevice = deviceFileEntry.is_character_file();
-            if (!entryIsCharacterDevice) {
+        std::vector<itas109::SerialPortInfo> detectedPorts = itas109::CSerialPortInfo::availablePortInfos();
+
+        for (const auto &portInfo : detectedPorts) {
+            std::string portName = portInfo.portName;
+
+#ifdef __linux__
+            bool isUsbCdcDevice =
+                (portName.find("ttyACM") != std::string::npos) || (portName.find("ttyUSB") != std::string::npos);
+            if (!isUsbCdcDevice) {
                 continue;
             }
+#endif
 
-            std::string deviceFilename = deviceFileEntry.path().filename().string();
-            bool deviceShouldBeIncludedInList = isAllowedSerialDeviceForEnumeration(deviceFilename);
-            if (!deviceShouldBeIncludedInList) {
-                continue;
+            gui::common::PortInfo info;
+            info.portPath = portName;
+            info.hardwareId = portInfo.hardwareId;
+
+            std::string description = getFriendlyDeviceName(portInfo.hardwareId, portInfo.description);
+            if (description.empty() || description == "n/a") {
+                info.friendlyName = portName;
+            } else {
+                info.friendlyName = std::string(description) + " (" + portName + ")";
             }
 
-            std::string fullDevicePath = deviceFileEntry.path().string();
-            availableSerialPortPaths.emplace_back(fullDevicePath);
+            availablePortInfos.push_back(info);
         }
-    } catch (const std::filesystem::filesystem_error &filesystemException) {
-        (void)filesystemException;
+    } catch (const std::exception &exception) {
+        (void)exception;
     }
 
-    std::sort(availableSerialPortPaths.begin(), availableSerialPortPaths.end());
-    return availableSerialPortPaths;
+    std::sort(
+        availablePortInfos.begin(),
+        availablePortInfos.end(),
+        [](const gui::common::PortInfo &a, const gui::common::PortInfo &b) {
+            return a.portPath < b.portPath;
+        });
+
+    return availablePortInfos;
 }
 
 bool SerialBackend::connect(const std::string &serialPortDevicePath)
@@ -112,29 +86,38 @@ bool SerialBackend::connect(const std::string &serialPortDevicePath)
 
     bool alreadyConnected = readerThreadIsRunning_;
     if (alreadyConnected) {
+        GUI_LOG_DEBUG("SerialBackend", "Already connected, disconnecting first");
         disconnect();
     }
 
-    constexpr int OPEN_FOR_READ_WRITE_NO_CONTROLLING_TTY = O_RDWR | O_NOCTTY;
-    int openedFileDescriptor = ::open(serialPortDevicePath.c_str(), OPEN_FOR_READ_WRITE_NO_CONTROLLING_TTY);
+    try {
+        GUI_LOG_DEBUG("SerialBackend", "Connecting to port: %s", serialPortDevicePath.c_str());
+        serialPort_ = std::make_unique<itas109::CSerialPort>();
+        serialPort_->init(serialPortDevicePath.c_str(), kPreferredBaudRate);
 
-    bool openFailed = (openedFileDescriptor < 0);
-    if (openFailed) {
+        bool openSucceeded = serialPort_->open();
+        if (!openSucceeded) {
+            GUI_LOG_ERROR(
+                "SerialBackend",
+                "Failed to open port: %s (error: %d)",
+                serialPortDevicePath.c_str(),
+                serialPort_->getLastError());
+            serialPort_.reset();
+            return false;
+        }
+
+        GUI_LOG_INFO("SerialBackend", "Connected to %s at %d baud", serialPortDevicePath.c_str(), kPreferredBaudRate);
+
+        readerThreadIsRunning_ = true;
+        disconnectCallbackPending_ = true;
+
+        readerThreadHandle_ = std::thread(&SerialBackend::serialPortReaderThreadLoop, this);
+        return true;
+    } catch (const std::exception &exception) {
+        GUI_LOG_ERROR("SerialBackend", "Exception opening port: %s", exception.what());
+        serialPort_.reset();
         return false;
     }
-
-    bool termiosConfigurationSucceeded = configureSerialPortTermios(openedFileDescriptor);
-    if (!termiosConfigurationSucceeded) {
-        ::close(openedFileDescriptor);
-        return false;
-    }
-
-    serialPortFileDescriptor_.reset(openedFileDescriptor);
-    readerThreadIsRunning_ = true;
-    disconnectCallbackPending_ = true;
-
-    readerThreadHandle_ = std::thread(&SerialBackend::serialPortReaderThreadLoop, this);
-    return true;
 }
 
 void SerialBackend::disconnect()
@@ -144,13 +127,20 @@ void SerialBackend::disconnect()
     {
         std::lock_guard<std::mutex> connectionLock(connectionStateMutex_);
 
-        bool notConnected = !readerThreadIsRunning_ && !serialPortFileDescriptor_.isValid();
+        bool notConnected = !readerThreadIsRunning_ && !serialPort_;
         if (notConnected) {
             return;
         }
 
         readerThreadIsRunning_ = false;
-        serialPortFileDescriptor_.reset();
+
+        if (serialPort_ && serialPort_->isOpen()) {
+            try {
+                serialPort_->close();
+            } catch (const std::exception &exception) {
+                (void)exception;
+            }
+        }
 
         readerThreadToJoin = std::move(readerThreadHandle_);
     }
@@ -188,77 +178,130 @@ void SerialBackend::setDisconnectCallback(DisconnectCallback connectionLostCallb
     connectionLostCallback_ = connectionLostCallback;
 }
 
-bool SerialBackend::configureSerialPortTermios(int fileDescriptor)
+bool SerialBackend::write(const std::uint8_t *data, std::size_t size)
 {
-    struct termios terminalAttributesConfiguration{};
+    GUI_LOG_INFO("SerialBackend", "write() called with %zu bytes", size);
 
-    constexpr int TCGETATTR_SUCCESS = 0;
-    bool getCurrentAttributesFailed = (tcgetattr(fileDescriptor, &terminalAttributesConfiguration) != TCGETATTR_SUCCESS);
-    if (getCurrentAttributesFailed) {
-        return false;
+    bool shouldTriggerDisconnect = false;
+
+    {
+        std::lock_guard<std::mutex> connectionLock(connectionStateMutex_);
+
+        bool notConnected = !serialPort_ || !serialPort_->isOpen();
+        if (notConnected) {
+            GUI_LOG_ERROR("SerialBackend", "Cannot write: not connected");
+            return false;
+        }
+
+        GUI_LOG_DEBUG("SerialBackend", "Connection OK, attempting writeData()");
+
+        try {
+            int bytesWritten = serialPort_->writeData(reinterpret_cast<const char *>(data), static_cast<int>(size));
+
+            if (bytesWritten < 0) {
+                int errorCode = serialPort_->getLastError();
+                const char *errorMessage = serialPort_->getLastErrorMsg();
+                GUI_LOG_ERROR("SerialBackend", "Write failed: error code %d (%s)", errorCode, errorMessage);
+
+                bool isDisconnectionError =
+                    (errorCode == itas109::ErrorNotOpen || errorCode == itas109::ErrorWriteFailed);
+                if (isDisconnectionError) {
+                    GUI_LOG_ERROR("SerialBackend", "Device disconnection detected via write error");
+                    shouldTriggerDisconnect = true;
+                }
+                return false;
+            }
+
+            bool writeSucceeded = (bytesWritten == static_cast<int>(size));
+
+            if (!writeSucceeded) {
+                GUI_LOG_ERROR(
+                    "SerialBackend",
+                    "Write incomplete: requested %zu bytes, wrote %d (error: %d)",
+                    size,
+                    bytesWritten,
+                    serialPort_->getLastError());
+            } else {
+                GUI_LOG_INFO("SerialBackend", "Wrote %d bytes successfully", bytesWritten);
+            }
+
+            return writeSucceeded;
+        } catch (const std::exception &exception) {
+            GUI_LOG_ERROR("SerialBackend", "Exception writing data: %s", exception.what());
+            return false;
+        }
     }
 
-    cfmakeraw(&terminalAttributesConfiguration);
+    if (shouldTriggerDisconnect) {
+        disconnect();
+    }
 
-    constexpr unsigned int IGNORE_MODEM_CONTROL_LINES_AND_ENABLE_RECEIVER = CLOCAL | CREAD;
-    terminalAttributesConfiguration.c_cflag |= IGNORE_MODEM_CONTROL_LINES_AND_ENABLE_RECEIVER;
-
-    cfsetispeed(&terminalAttributesConfiguration, kPreferredBaud);
-    cfsetospeed(&terminalAttributesConfiguration, kPreferredBaud);
-
-    constexpr cc_t READ_TIMEOUT_DECISECONDS = 1;
-    constexpr cc_t MINIMUM_BYTES_FOR_READ_TO_RETURN = 0;
-    terminalAttributesConfiguration.c_cc[VTIME] = READ_TIMEOUT_DECISECONDS;
-    terminalAttributesConfiguration.c_cc[VMIN] = MINIMUM_BYTES_FOR_READ_TO_RETURN;
-
-    constexpr int TCSETATTR_SUCCESS = 0;
-    bool setNewAttributesSucceeded = (tcsetattr(fileDescriptor, TCSANOW, &terminalAttributesConfiguration) == TCSETATTR_SUCCESS);
-
-    return setNewAttributesSucceeded;
+    return false;
 }
 
 void SerialBackend::serialPortReaderThreadLoop()
 {
-    constexpr size_t READ_BUFFER_SIZE_BYTES = 512;
-    etl::array<std::uint8_t, READ_BUFFER_SIZE_BYTES> receiveBuffer{};
+    constexpr size_t READ_BUFFER_SIZE_BYTES = 4096;
+    etl::array<char, READ_BUFFER_SIZE_BYTES> receiveBuffer{};
+
+    GUI_LOG_DEBUG("SerialBackend", "Reader thread started");
+
+    int consecutiveZeroReads = 0;
+    constexpr int MAX_ZERO_READS_BEFORE_PORT_CHECK = 100;
 
     while (readerThreadIsRunning_.load()) {
-        ssize_t bytesReadOrError = ::read(serialPortFileDescriptor_.get(), receiveBuffer.data(), receiveBuffer.size());
-
-        bool dataWasSuccessfullyRead = (bytesReadOrError > 0);
-        if (dataWasSuccessfullyRead) {
-            DataCallback localCallbackCopy;
-            {
-                std::lock_guard<std::mutex> callbackLock(callbackAccessMutex_);
-                localCallbackCopy = dataReceivedCallback_;
+        try {
+            if (!serialPort_ || !serialPort_->isOpen()) {
+                GUI_LOG_ERROR("SerialBackend", "Port is no longer open");
+                break;
             }
 
-            bool callbackIsRegistered = (localCallbackCopy != nullptr);
-            if (callbackIsRegistered) {
-                size_t bytesReadCount = static_cast<std::size_t>(bytesReadOrError);
-                localCallbackCopy(receiveBuffer.data(), bytesReadCount);
-            }
-            continue;
-        }
+            int bytesRead = serialPort_->readAllData(receiveBuffer.data());
 
-        bool endOfFileReached = (bytesReadOrError == 0);
-        if (endOfFileReached) {
+            if (bytesRead > 0) {
+                consecutiveZeroReads = 0;
+                GUI_LOG_VERBOSE("SerialBackend", "Read %d bytes", bytesRead);
+                DataCallback localCallbackCopy;
+                {
+                    std::lock_guard<std::mutex> callbackLock(callbackAccessMutex_);
+                    localCallbackCopy = dataReceivedCallback_;
+                }
+
+                bool callbackIsRegistered = (localCallbackCopy != nullptr);
+                if (callbackIsRegistered) {
+                    localCallbackCopy(
+                        reinterpret_cast<const std::uint8_t *>(receiveBuffer.data()), static_cast<size_t>(bytesRead));
+                }
+            } else if (bytesRead == 0) {
+                consecutiveZeroReads++;
+
+                if (consecutiveZeroReads >= MAX_ZERO_READS_BEFORE_PORT_CHECK) {
+                    if (!serialPort_->isOpen()) {
+                        GUI_LOG_ERROR("SerialBackend", "Port check failed - device disconnected");
+                        break;
+                    }
+                    consecutiveZeroReads = 0;
+                }
+
+                constexpr int POLLING_DELAY_MILLISECONDS = 10;
+                std::this_thread::sleep_for(std::chrono::milliseconds(POLLING_DELAY_MILLISECONDS));
+            } else {
+                int errorCode = serialPort_->getLastError();
+                const char *errorMessage = serialPort_->getLastErrorMsg();
+                GUI_LOG_ERROR(
+                    "SerialBackend", "Serial read error: %d, error code: %d (%s)", bytesRead, errorCode, errorMessage);
+
+                bool isDisconnectionError =
+                    (errorCode == itas109::ErrorNotOpen || errorCode == itas109::ErrorReadFailed);
+                if (isDisconnectionError) {
+                    GUI_LOG_ERROR("SerialBackend", "Device disconnection detected via read error");
+                }
+                break;
+            }
+        } catch (const std::exception &exception) {
+            GUI_LOG_ERROR("SerialBackend", "Serial exception: %s", exception.what());
             break;
         }
-
-        bool readSystemCallInterrupted = (errno == EINTR);
-        if (readSystemCallInterrupted) {
-            continue;
-        }
-
-        bool readWouldBlockOrNoDataAvailable = (errno == EAGAIN) || (errno == EWOULDBLOCK);
-        if (readWouldBlockOrNoDataAvailable) {
-            constexpr int POLLING_DELAY_MILLISECONDS = 10;
-            std::this_thread::sleep_for(std::chrono::milliseconds(POLLING_DELAY_MILLISECONDS));
-            continue;
-        }
-
-        break;
     }
 
     readerThreadIsRunning_ = false;
