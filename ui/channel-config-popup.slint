@@ -2,9 +2,10 @@ import { Button, SpinBox, Slider } from "std-widgets.slint";
 
 component ValueConfig inherits HorizontalLayout {
     in-out property <string> property_name: "Value";
-    in-out property <float> min_value: 0.0;
-    in-out property <float> max_value: 100.0;
-    in-out property <float> middle_value: 50.0;
+    in-out property <float> value: 0.0;
+    in-out property <float> min_limit: -100.0;
+    in-out property <float> max_limit: 100.0;
+    callback value_changed(float);
 
     spacing: 10px;
     height: 30px;
@@ -17,35 +18,103 @@ component ValueConfig inherits HorizontalLayout {
     }
 
     Slider {
-        value: root.min_value;
-        minimum: -100.0;
-        maximum: root.middle_value - 0.1;
-        changed(value) => {
-            root.min_value = value;
+        value: root.value;
+        minimum: root.min_limit;
+        maximum: root.max_limit;
+        changed(new_value) => {
+            root.value = new_value;
+            root.value_changed(new_value);
         }
     }
 
     SpinBox {
         width: 110px;
-        value: root.min_value;
-        minimum: -100.0;
-        maximum: root.middle_value - 0.1;
-        edited(value) => {
-            root.min_value = value;
+        value: root.value;
+        minimum: root.min_limit;
+        maximum: root.max_limit;
+        edited(new_value) => {
+            root.value = new_value;
+            root.value_changed(new_value);
+        }
+    }
+}
+
+component ConfirmDialog inherits Rectangle {
+    callback save_and_close;
+    callback discard_and_close;
+    callback cancel;
+
+    width: 400px;
+    height: 180px;
+    background: #2a2a2a;
+    border-radius: 8px;
+    border-width: 2px;
+    border-color: #ff9933;
+
+    VerticalLayout {
+        padding: 20px;
+        spacing: 16px;
+
+        Text {
+            text: "Unsaved Changes";
+            font-size: 18px;
+            color: #fff;
+            horizontal-alignment: center;
+        }
+
+        Text {
+            text: "You have unsaved changes. What would you like to do?";
+            font-size: 14px;
+            color: #ccc;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+        }
+
+        HorizontalLayout {
+            spacing: 10px;
+            padding-top: 10px;
+
+            Button {
+                text: "Save";
+                clicked => {
+                    root.save_and_close();
+                }
+            }
+
+            Button {
+                text: "Discard";
+                clicked => {
+                    root.discard_and_close();
+                }
+            }
+
+            Button {
+                text: "Cancel";
+                clicked => {
+                    root.cancel();
+                }
+            }
         }
     }
 }
 
 export component ChannelConfigPopup inherits Rectangle {
+    in-out property <int> channel_index: 0;
     in-out property <string> note: "";
     in-out property <float> min_value: 0.0;
     in-out property <float> max_value: 0.0;
     in-out property <float> middle_value: 0.0;
     in-out property <string> fault: "";
+    in-out property <bool> is_dirty: false;
+    in-out property <bool> is_assigning_note: false;
+
     callback assign_note;
     callback reset_note;
     callback reset_fault;
+    callback save;
     callback close;
+
+    private property <bool> show_confirm_dialog: false;
 
     width: 600px;
     height: 320px;
@@ -62,6 +131,20 @@ export component ChannelConfigPopup inherits Rectangle {
     }
 
     Button {
+        text: "Save";
+        width: 70px;
+        height: 36px;
+        x: 8px;
+        y: 8px;
+        enabled: root.is_dirty;
+
+        clicked => {
+            root.save();
+            root.is_dirty = false;
+        }
+    }
+
+    Button {
         text: "X";
         width: 36px;
         height: 36px;
@@ -69,7 +152,12 @@ export component ChannelConfigPopup inherits Rectangle {
         y: 8px;
 
         clicked => {
-            root.close();
+            if (root.is_dirty) {
+                root.show_confirm_dialog = true;
+            } else {
+                root.is_assigning_note = false;
+                root.close();
+            }
         }
     }
 
@@ -93,26 +181,40 @@ export component ChannelConfigPopup inherits Rectangle {
             spacing: 18px;
             width: 240px;
 
-            Text {
-                text: "Note: " + root.note;
-                color: #eee;
-                font-size: 18px;
+            Rectangle {
+                height: 30px;
+                background: root.is_assigning_note ? #445533 : transparent;
+                border-radius: 4px;
+                border-width: root.is_assigning_note ? 2px : 0px;
+                border-color: #88cc44;
+
+                Text {
+                    text: root.is_assigning_note ? "Waiting for MIDI..." : ("Note: " + root.note);
+                    color: root.is_assigning_note ? #88cc44 : #eee;
+                    font-size: 18px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
             }
 
             HorizontalLayout {
                 spacing: 10px;
                 Button {
                     text: "Assign New Note";
+                    enabled: !root.is_assigning_note;
                     clicked => {
                         root.assign_note();
+                        root.is_assigning_note = true;
                     }
                 }
 
                 Button {
                     text: "Reset Note";
                     width: 88px;
+                    enabled: !root.is_assigning_note;
                     clicked => {
                         root.reset_note();
+                        root.is_dirty = true;
                     }
                 }
             }
@@ -138,23 +240,66 @@ export component ChannelConfigPopup inherits Rectangle {
 
             ValueConfig {
                 property_name: "Min:";
-                min_value: -100.0;
-                max_value: root.middle_value - 0.1;
-                middle_value: root.min_value;
+                value <=> root.min_value;
+                min_limit: -100.0;
+                max_limit: root.middle_value - 0.1;
+                value_changed(new_val) => {
+                    root.is_dirty = true;
+                }
             }
 
             ValueConfig {
                 property_name: "Middle:";
-                min_value: root.min_value + 0.1;
-                max_value: root.max_value - 0.1;
-                middle_value: root.middle_value;
+                value <=> root.middle_value;
+                min_limit: root.min_value + 0.1;
+                max_limit: root.max_value - 0.1;
+                value_changed(new_val) => {
+                    root.is_dirty = true;
+                }
             }
 
             ValueConfig {
                 property_name: "Max:";
-                min_value: root.middle_value + 0.1;
-                max_value: 100.0;
-                middle_value: root.max_value;
+                value <=> root.max_value;
+                min_limit: root.middle_value + 0.1;
+                max_limit: 100.0;
+                value_changed(new_val) => {
+                    root.is_dirty = true;
+                }
+            }
+        }
+    }
+
+    Rectangle {
+        visible: root.show_confirm_dialog;
+        z: 200;
+        x: 0px;
+        y: 0px;
+        width: parent.width;
+        height: parent.height;
+        background: #000a;
+
+        ConfirmDialog {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+
+            save_and_close => {
+                root.show_confirm_dialog = false;
+                root.save();
+                root.is_dirty = false;
+                root.is_assigning_note = false;
+                root.close();
+            }
+
+            discard_and_close => {
+                root.show_confirm_dialog = false;
+                root.is_dirty = false;
+                root.is_assigning_note = false;
+                root.close();
+            }
+
+            cancel => {
+                root.show_confirm_dialog = false;
             }
         }
     }
