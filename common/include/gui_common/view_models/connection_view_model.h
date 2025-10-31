@@ -2,10 +2,10 @@
 
 #include "etl/delegate.h"
 #include "gui_common/backends/connection_backend.h"
-#include "gui_common/frame_parser.h"
 #include "gui_common/message_processor.h"
 #include "gui_common/view_models/channel_telemetry_view_model.h"
 #include "gui_common/view_models/midi_message_view_model.h"
+#include "libcomm/stream_processor.h"
 
 #include <mutex>
 #include <vector>
@@ -62,7 +62,7 @@ private:
     MidiMessageViewModel &midiMessageViewModelReference_;
     ChannelTelemetryViewModel &channelTelemetryViewModelReference_;
     MessageProcessor messageProcessor_;
-    FrameParser frameParser_;
+    libcomm::StreamProcessor streamProcessor_;
 
     PortsChangedCallback portsListChangedCallback_;
     ConnectionChangedCallback connectionStateChangedCallback_;

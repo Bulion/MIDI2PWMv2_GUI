@@ -23,8 +23,8 @@ ConnectionViewModel::ConnectionViewModel(ConnectionBackend &connectionBackend,
     connectionBackendReference_.setDisconnectCallback(backendDisconnectedCallback);
 
     auto parsedFrameReadyCallback =
-        FrameParser::FrameCallback::create<ConnectionViewModel, &ConnectionViewModel::handleIncomingParsedFrame>(*this);
-    frameParser_.setCallback(parsedFrameReadyCallback);
+        libcomm::StreamProcessor::FrameCallback::create<ConnectionViewModel, &ConnectionViewModel::handleIncomingParsedFrame>(*this);
+    streamProcessor_.setFrameCallback(parsedFrameReadyCallback);
 
     auto midiChannelMessageCallback = MessageProcessor::MidiChannelMessageCallback::
         create<ConnectionViewModel, &ConnectionViewModel::handleMidiChannelMessageReceived>(*this);
@@ -135,7 +135,7 @@ void ConnectionViewModel::handleIncomingParsedFrame(
 
 void ConnectionViewModel::handleRawDataFromBackend(const std::uint8_t *receivedData, std::size_t receivedSizeBytes)
 {
-    frameParser_.feed(receivedData, receivedSizeBytes);
+    streamProcessor_.feed(receivedData, receivedSizeBytes);
 }
 
 void ConnectionViewModel::handleBackendDisconnected()
@@ -145,7 +145,7 @@ void ConnectionViewModel::handleBackendDisconnected()
         isCurrentlyConnected_ = false;
         connectionState_ = ConnectionState::Disconnected;
         receivedTelemetryChannelCount_ = 0;
-        frameParser_.reset();
+        streamProcessor_.reset();
     }
 
     midiMessageViewModelReference_.clear();
@@ -184,7 +184,7 @@ void ConnectionViewModel::handleMidiChannelMessageReceived(const midi2pwm::midi:
 
 void ConnectionViewModel::handlePwmTelemetryReceived(const midi2pwm::pwm::ChannelTelemetry &telemetry)
 {
-    GUI_LOG_INFO("ConnectionVM", "handlePwmTelemetryReceived called for channel %u", telemetry.channel_number());
+    GUI_LOG_VERBOSE("ConnectionVM", "Telemetry received for channel %u", telemetry.channel_number());
 
     channelTelemetryViewModelReference_.updateFromTelemetry(telemetry);
 
@@ -193,7 +193,7 @@ void ConnectionViewModel::handlePwmTelemetryReceived(const midi2pwm::pwm::Channe
         std::lock_guard<std::mutex> stateLock(viewModelStateMutex_);
 
         const char *stateNames[] = {"Disconnected", "WaitingForHeartBeatResponse", "WaitingForTelemetryData", "FullyConnected"};
-        GUI_LOG_DEBUG("ConnectionVM", "Current state: %s", stateNames[static_cast<int>(connectionState_)]);
+        GUI_LOG_VERBOSE("ConnectionVM", "Current state: %s", stateNames[static_cast<int>(connectionState_)]);
 
         if (connectionState_ == ConnectionState::WaitingForTelemetryData) {
             receivedTelemetryChannelCount_++;
@@ -203,8 +203,10 @@ void ConnectionViewModel::handlePwmTelemetryReceived(const midi2pwm::pwm::Channe
             if (receivedTelemetryChannelCount_ >= EXPECTED_CHANNEL_COUNT) {
                 shouldCheckConnectionState = true;
             }
+        } else if (connectionState_ == ConnectionState::FullyConnected) {
+            GUI_LOG_VERBOSE("ConnectionVM", "Ongoing telemetry update for channel %u", telemetry.channel_number());
         } else {
-            GUI_LOG_WARNING("ConnectionVM", "Received telemetry but not in WaitingForTelemetryData state (current: %s)",
+            GUI_LOG_WARNING("ConnectionVM", "Received telemetry in unexpected state: %s",
                             stateNames[static_cast<int>(connectionState_)]);
         }
     }
