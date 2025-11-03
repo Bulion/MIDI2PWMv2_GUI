@@ -59,17 +59,63 @@ void MessageProcessor::setResponseCallback(ResponseCallback callback)
 
 bool MessageProcessor::sendChannelConfig(const midi2pwm::pwm::ChannelConfigT &config)
 {
-    GUI_LOG_INFO("MessageProcessor", "Building ChannelConfig message: ch=%u, note=%u, min=%f, mid=%f, max=%f",
-                 config.channel_number, config.note, config.min_point, config.midpoint, config.max_point);
+    GUI_LOG_INFO("MessageProcessor", "Building ChannelConfig message: ch=%u, note=%u, mode=%d",
+                 config.channel_number, config.note, static_cast<int>(config.output_mode));
 
-    auto buffer = libcomm::BuildChannelConfigMessage(
+    flatbuffers::FlatBufferBuilder builder;
+
+    // Pack the mode parameters union
+    flatbuffers::Offset<void> mode_params_offset = 0;
+    midi2pwm::pwm::ModeParametersUnion mode_params_type = midi2pwm::pwm::ModeParametersUnion::NONE;
+
+    if (config.mode_params.type == midi2pwm::pwm::ModeParametersUnion::InstantModeParams) {
+        const auto* instant = config.mode_params.AsInstantModeParams();
+        if (instant) {
+            mode_params_offset = midi2pwm::pwm::CreateInstantModeParams(
+                builder,
+                instant->on_level,
+                instant->velocity_sensitive
+            ).Union();
+            mode_params_type = midi2pwm::pwm::ModeParametersUnion::InstantModeParams;
+        }
+    } else if (config.mode_params.type == midi2pwm::pwm::ModeParametersUnion::RampedModeParams) {
+        const auto* ramped = config.mode_params.AsRampedModeParams();
+        if (ramped) {
+            mode_params_offset = midi2pwm::pwm::CreateRampedModeParams(
+                builder,
+                ramped->on_level,
+                ramped->velocity_sensitive,
+                ramped->attack_time_ms,
+                ramped->release_time_ms
+            ).Union();
+            mode_params_type = midi2pwm::pwm::ModeParametersUnion::RampedModeParams;
+        }
+    }
+
+    // Create the ChannelConfig message with all fields
+    auto channel_config = midi2pwm::pwm::CreateChannelConfig(
+        builder,
         config.channel_number,
         config.configuration,
         config.note,
         config.midpoint,
         config.min_point,
-        config.max_point
+        config.max_point,
+        config.output_mode,
+        mode_params_type,
+        mode_params_offset
     );
+
+    // Wrap in envelope
+    auto envelope = midi2pwm::pwm::CreateEnvelope(
+        builder,
+        midi2pwm::pwm::Message::ChannelConfig,
+        channel_config.Union()
+    );
+
+    builder.Finish(envelope, midi2pwm::pwm::EnvelopeIdentifier());
+
+    flatbuffers::DetachedBuffer buffer = builder.Release();
 
     GUI_LOG_DEBUG("MessageProcessor", "Buffer size: %zu bytes", buffer.size());
 
