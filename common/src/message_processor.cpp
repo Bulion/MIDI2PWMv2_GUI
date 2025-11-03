@@ -5,8 +5,8 @@ namespace gui::common
 {
 
 MessageProcessor::MessageProcessor()
-    : midiEndpoint_(libcomm::MidiEndpoint::WriteCallback::create<&MessageProcessor::NullWrite>(), true)
-    , pwmEndpoint_(libcomm::PwmEndpoint::WriteCallback::create<&MessageProcessor::NullWrite>(), true)
+    : midiEndpoint_(libcomm::MidiEndpoint::WriteCallback::create<&MessageProcessor::NullWrite>())
+    , pwmEndpoint_(libcomm::PwmEndpoint::WriteCallback::create<&MessageProcessor::NullWrite>())
 {
     midiEndpoint_.OnChannelMessage(
         libcomm::MidiEndpoint::ChannelMessageHandler::create<MessageProcessor, &MessageProcessor::HandleMidiChannelMessage>(*this));
@@ -19,8 +19,8 @@ MessageProcessor::MessageProcessor()
 }
 
 MessageProcessor::MessageProcessor(WriteCallback writeCallback)
-    : midiEndpoint_(writeCallback, true)
-    , pwmEndpoint_(writeCallback, true)
+    : midiEndpoint_(writeCallback)
+    , pwmEndpoint_(writeCallback)
 {
     midiEndpoint_.OnChannelMessage(
         libcomm::MidiEndpoint::ChannelMessageHandler::create<MessageProcessor, &MessageProcessor::HandleMidiChannelMessage>(*this));
