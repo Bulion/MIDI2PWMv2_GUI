@@ -162,5 +162,9 @@ extern "C" void app_main(void)
     app->set_show_connection_screen(true);
     app->set_midi_message("No midi message received yet");
 
+    slint::Timer timer(std::chrono::milliseconds(100), [&connection_view_model]() {
+        connection_view_model.update();
+    });
+
     app->run();
 }

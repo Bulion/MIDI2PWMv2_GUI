@@ -301,6 +301,10 @@ int main()
 
     app->set_midi_message("No midi message received yet");
 
+    slint::Timer timer(std::chrono::milliseconds(100), [&connection_view_model]() {
+        connection_view_model.update();
+    });
+
     app->run();
 
     GUI_LOG_INFO("Shutdown", "Application window closed, disconnecting from device");
