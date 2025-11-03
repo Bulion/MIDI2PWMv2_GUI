@@ -61,11 +61,9 @@ component Card inherits Rectangle {
             min_value: 0.0;
             max_value: 100.0;
             value: voltage / 36.0 * 100.0;
-            middle_value: 20.0;
             flip: false;
             track_color: #ddd;
             fill_color: #3399ff;
-            middle_color: #ff8800;
         }
 
         HorizontalLayout {
@@ -157,11 +155,9 @@ component InvertedCard inherits Rectangle {
             min_value: 0.0;
             max_value: 100.0;
             value: voltage / 36.0 * 100.0;
-            middle_value: 20.0;
             flip: true;
             track_color: #ddd;
             fill_color: #3399ff;
-            middle_color: #ff8800;
         }
     }
 }
