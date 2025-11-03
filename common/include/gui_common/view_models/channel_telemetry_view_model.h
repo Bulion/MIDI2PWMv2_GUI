@@ -13,15 +13,29 @@
 namespace gui::common
 {
 
+struct InstantModeData
+{
+    std::uint8_t on_level;
+    bool velocity_sensitive;
+};
+
+struct RampedModeData
+{
+    std::uint8_t on_level;
+    bool velocity_sensitive;
+    std::uint16_t attack_time_ms;
+    std::uint16_t release_time_ms;
+};
+
 struct ChannelData
 {
     etl::string<16> note;
     float voltage;
     float current;
-    float minValue;
-    float maxValue;
-    float middleValue;
     etl::string<32> fault;
+    std::uint8_t mode_type;
+    InstantModeData instant_data;
+    RampedModeData ramped_data;
 };
 
 class ChannelTelemetryViewModel

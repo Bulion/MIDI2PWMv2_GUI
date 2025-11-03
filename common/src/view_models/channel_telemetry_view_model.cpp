@@ -36,20 +36,33 @@ void ChannelTelemetryViewModel::updateFromTelemetry(const midi2pwm::pwm::Channel
         channelData.note = midiNoteToString(telemetry.note());
         channelData.voltage = telemetry.voltage();
         channelData.current = telemetry.current();
-        channelData.minValue = telemetry.min_point();
-        channelData.maxValue = telemetry.max_point();
-        channelData.middleValue = telemetry.midpoint();
         channelData.fault = statusToString(telemetry.status(), telemetry.had_fault());
 
-        GUI_LOG_DEBUG(TAG, "Channel %u: note=%s, voltage=%.1fV, current=%.1fmA, status=%s, config=(%.1f/%.1f/%.1f)",
+        channelData.mode_type = static_cast<std::uint8_t>(telemetry.output_mode());
+
+        const auto modeParamsType = telemetry.mode_params_type();
+        if (modeParamsType == midi2pwm::pwm::ModeParametersUnion::InstantModeParams) {
+            const auto* instantParams = telemetry.mode_params_as_InstantModeParams();
+            if (instantParams != nullptr) {
+                channelData.instant_data.on_level = instantParams->on_level();
+                channelData.instant_data.velocity_sensitive = instantParams->velocity_sensitive();
+            }
+        } else if (modeParamsType == midi2pwm::pwm::ModeParametersUnion::RampedModeParams) {
+            const auto* rampedParams = telemetry.mode_params_as_RampedModeParams();
+            if (rampedParams != nullptr) {
+                channelData.ramped_data.on_level = rampedParams->on_level();
+                channelData.ramped_data.velocity_sensitive = rampedParams->velocity_sensitive();
+                channelData.ramped_data.attack_time_ms = rampedParams->attack_time_ms();
+                channelData.ramped_data.release_time_ms = rampedParams->release_time_ms();
+            }
+        }
+
+        GUI_LOG_DEBUG(TAG, "Channel %u: note=%s, voltage=%.1fV, current=%.1fmA, status=%s",
                       channelNumber,
                       channelData.note.c_str(),
                       channelData.voltage,
                       channelData.current,
-                      channelData.fault.c_str(),
-                      channelData.minValue,
-                      channelData.middleValue,
-                      channelData.maxValue);
+                      channelData.fault.c_str());
 
         callback = updateCallback_;
     }
@@ -69,10 +82,10 @@ void ChannelTelemetryViewModel::clear()
             channelData.note = "---";
             channelData.voltage = 0.0F;
             channelData.current = 0.0F;
-            channelData.minValue = 0.0F;
-            channelData.maxValue = 36.0F;
-            channelData.middleValue = 18.0F;
             channelData.fault = "";
+            channelData.mode_type = 0;
+            channelData.instant_data = {255, true};
+            channelData.ramped_data = {255, true, 100, 100};
         }
 
         callback = updateCallback_;
