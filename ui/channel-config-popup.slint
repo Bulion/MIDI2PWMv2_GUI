@@ -1,42 +1,11 @@
-import { Button, SpinBox, Slider } from "std-widgets.slint";
+import { Button, SpinBox, Slider, ComboBox, CheckBox } from "std-widgets.slint";
+import { InstantModeParams, InstantModeData } from "mode-params/instant-mode-params.slint";
+import { RampedModeParams, RampedModeData } from "mode-params/ramped-mode-params.slint";
 
-component ValueConfig inherits HorizontalLayout {
-    in-out property <string> property_name: "Value";
-    in-out property <float> value: 0.0;
-    in-out property <float> min_limit: -100.0;
-    in-out property <float> max_limit: 100.0;
-    callback value_changed(float);
-
-    spacing: 10px;
-    height: 30px;
-
-    Text {
-        text: property_name;
-        color: #bbb;
-        vertical-alignment: center;
-        width: 45px;
-    }
-
-    Slider {
-        value: root.value;
-        minimum: root.min_limit;
-        maximum: root.max_limit;
-        changed(new_value) => {
-            root.value = new_value;
-            root.value_changed(new_value);
-        }
-    }
-
-    SpinBox {
-        width: 110px;
-        value: root.value;
-        minimum: root.min_limit;
-        maximum: root.max_limit;
-        edited(new_value) => {
-            root.value = new_value;
-            root.value_changed(new_value);
-        }
-    }
+export struct ModeConfig {
+    mode_type: int,
+    instant_data: InstantModeData,
+    ramped_data: RampedModeData,
 }
 
 component ConfirmDialog inherits Rectangle {
@@ -44,7 +13,7 @@ component ConfirmDialog inherits Rectangle {
     callback discard_and_close;
     callback cancel;
 
-    width: 400px;
+    width: 420px;
     height: 180px;
     background: #2a2a2a;
     border-radius: 8px;
@@ -101,12 +70,15 @@ component ConfirmDialog inherits Rectangle {
 export component ChannelConfigPopup inherits Rectangle {
     in-out property <int> channel_index: 0;
     in-out property <string> note: "";
-    in-out property <float> min_value: 0.0;
-    in-out property <float> max_value: 0.0;
-    in-out property <float> middle_value: 0.0;
     in-out property <string> fault: "";
     in-out property <bool> is_dirty: false;
     in-out property <bool> is_assigning_note: false;
+
+    in-out property <ModeConfig> mode_config: {
+        mode_type: 0,
+        instant_data: { on_level: 255, velocity_sensitive: true },
+        ramped_data: { on_level: 255, velocity_sensitive: true, attack_time_ms: 100, release_time_ms: 100 },
+    };
 
     callback assign_note;
     callback reset_note;
@@ -116,73 +88,80 @@ export component ChannelConfigPopup inherits Rectangle {
 
     private property <bool> show_confirm_dialog: false;
 
-    width: 600px;
-    height: 320px;
+    width: 640px;
+    height: 400px;
     background: #232323;
     border-radius: 12px;
     border-width: 2px;
     border-color: #aaa;
 
     TouchArea {
-        x: 0px;
-        y: 0px;
         width: parent.width;
         height: parent.height;
     }
+    
+    VerticalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        padding-top: 12px;
+        alignment: LayoutAlignment.stretch;
+        padding-bottom: 12px;
+        spacing: 12px;
 
-    Button {
-        text: "Save";
-        width: 70px;
-        height: 36px;
-        x: 8px;
-        y: 8px;
-        enabled: root.is_dirty;
 
-        clicked => {
-            root.save();
-            root.is_dirty = false;
-        }
-    }
-
-    Button {
-        text: "X";
-        width: 36px;
-        height: 36px;
-        x: parent.width - self.width - 8px;
-        y: 8px;
-
-        clicked => {
-            if (root.is_dirty) {
-                root.show_confirm_dialog = true;
-            } else {
-                root.is_assigning_note = false;
-                root.close();
+        HorizontalLayout {
+            Button {
+                text: "Save";
+                width: 70px;
+                height: 36px;
+                enabled: root.is_dirty;
+            
+                clicked => {
+                    root.save();
+                    root.is_dirty = false;
+                }
+            }
+            Text {
+                text: "Configure Channel";
+                vertical-alignment: TextVerticalAlignment.center;
+                font-size: 18px;
+                horizontal-alignment: TextHorizontalAlignment.center;
+                color: #ffffff;
+            }
+            Button {
+                text: "X";
+                width: 36px;
+                height: 36px;
+            
+                clicked => {
+                    if (root.is_dirty) {
+                        root.show_confirm_dialog = true;
+                    } else {
+                        root.is_assigning_note = false;
+                        root.close();
+                    }
+                }
             }
         }
-    }
+        HorizontalLayout {
+            alignment: LayoutAlignment.stretch;
+            spacing: 12px;
 
-    Text {
-        text: "Configure Channel";
-        font-size: 22px;
-        color: #fff;
-        horizontal-alignment: center;
-        y: 12px;
-        width: parent.width;
-    }
+            VerticalLayout {
+                alignment: LayoutAlignment.start;
+                spacing: 12px;
+                width: 50%;
 
-    HorizontalLayout {
-        spacing: 32px;
-        y: 56px;
-        width: parent.width;
-        height: parent.height - self.y - 16px;
-        padding: 24px;
-
-        VerticalLayout {
-            spacing: 18px;
-            width: 240px;
+            Text {
+                text: "Note Configuration";
+                font-size: 14px;
+                color: #fff;
+                font-weight: 600;
+                height: 24px;
+            }
 
             Rectangle {
-                height: 30px;
+                height: 36px;
                 background: root.is_assigning_note ? #445533 : transparent;
                 border-radius: 4px;
                 border-width: root.is_assigning_note ? 2px : 0px;
@@ -191,16 +170,16 @@ export component ChannelConfigPopup inherits Rectangle {
                 Text {
                     text: root.is_assigning_note ? "Waiting for MIDI..." : ("Note: " + root.note);
                     color: root.is_assigning_note ? #88cc44 : #eee;
-                    font-size: 18px;
+                    font-size: 16px;
                     horizontal-alignment: center;
                     vertical-alignment: center;
                 }
             }
 
             HorizontalLayout {
-                spacing: 10px;
+                spacing: 8px;
                 Button {
-                    text: "Assign New Note";
+                    text: "Assign";
                     enabled: !root.is_assigning_note;
                     clicked => {
                         root.assign_note();
@@ -209,8 +188,7 @@ export component ChannelConfigPopup inherits Rectangle {
                 }
 
                 Button {
-                    text: "Reset Note";
-                    width: 88px;
+                    text: "Reset";
                     enabled: !root.is_assigning_note;
                     clicked => {
                         root.reset_note();
@@ -219,10 +197,21 @@ export component ChannelConfigPopup inherits Rectangle {
                 }
             }
 
+            Rectangle {
+                height: 8px;
+            }
+
             Text {
-                text: "Fault: " + (root.fault == "" ? "None" : root.fault);
+                text: "Fault Status";
+                font-size: 14px;
+                color: #fff;
+                font-weight: 600;
+            }
+
+            Text {
+                text: root.fault == "" ? "None" : root.fault;
                 color: root.fault == "" ? #0f0 : #f66;
-                font-size: 16px;
+                font-size: 13px;
             }
 
             Button {
@@ -235,38 +224,72 @@ export component ChannelConfigPopup inherits Rectangle {
             }
         }
 
+        Rectangle {
+            width: 1px;
+            background: #444;
+        }
+
         VerticalLayout {
-            spacing: 5px;
+            alignment: LayoutAlignment.start;
+            spacing: 8px;
 
-            ValueConfig {
-                property_name: "Min:";
-                value <=> root.min_value;
-                min_limit: -100.0;
-                max_limit: root.middle_value - 0.1;
-                value_changed(new_val) => {
+            Text {
+                text: "Output Mode";
+                font-size: 14px;
+                color: #fff;
+                font-weight: 600;
+                height: 24px;
+            }
+
+            ComboBox {
+                height: 30px;
+                model: ["Instant On/Off", "Ramped On/Off", "Timed Pulse", "Toggle", "ADSR Envelope", "CC Control", "Pitch Bend"];
+                current-index: root.mode_config.mode_type;
+                selected(selected_value) => {
+                    if (selected_value == "Instant On/Off") {
+                        root.mode_config.mode_type = 0;
+                    } else if (selected_value == "Ramped On/Off") {
+                        root.mode_config.mode_type = 1;
+                    } else if (selected_value == "Timed Pulse") {
+                        root.mode_config.mode_type = 2;
+                    } else if (selected_value == "Toggle") {
+                        root.mode_config.mode_type = 3;
+                    } else if (selected_value == "ADSR Envelope") {
+                        root.mode_config.mode_type = 4;
+                    } else if (selected_value == "CC Control") {
+                        root.mode_config.mode_type = 5;
+                    } else if (selected_value == "Pitch Bend") {
+                        root.mode_config.mode_type = 6;
+                    }
                     root.is_dirty = true;
                 }
             }
 
-            ValueConfig {
-                property_name: "Middle:";
-                value <=> root.middle_value;
-                min_limit: root.min_value + 0.1;
-                max_limit: root.max_value - 0.1;
-                value_changed(new_val) => {
+            Text {
+                text: "Parameters";
+                font-size: 14px;
+                color: #fff;
+                font-weight: 600;
+                height: 24px;
+            }
+
+            if root.mode_config.mode_type == 0: InstantModeParams {
+                data: root.mode_config.instant_data;
+                spacing: 0px;
+                changed => {
+                    root.mode_config.instant_data = self.data;
                     root.is_dirty = true;
                 }
             }
 
-            ValueConfig {
-                property_name: "Max:";
-                value <=> root.max_value;
-                min_limit: root.middle_value + 0.1;
-                max_limit: 100.0;
-                value_changed(new_val) => {
+            if root.mode_config.mode_type == 1: RampedModeParams {
+                data: root.mode_config.ramped_data;
+                changed => {
+                    root.mode_config.ramped_data = self.data;
                     root.is_dirty = true;
                 }
             }
+        }
         }
     }
 
