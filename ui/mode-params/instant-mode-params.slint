@@ -1,0 +1,52 @@
+import { Slider, CheckBox } from "std-widgets.slint";
+
+export struct InstantModeData {
+    on_level: int,
+    velocity_sensitive: bool,
+}
+
+export component InstantModeParams inherits VerticalLayout {
+    in-out property <InstantModeData> data: {
+        on_level: 255,
+        velocity_sensitive: true,
+    };
+
+    callback changed();
+
+    spacing: 6px;
+
+    HorizontalLayout {
+        spacing: 6px;
+        Text {
+            text: "On Level:";
+            color: #ccc;
+            vertical-alignment: center;
+            width: 70px;
+            font-size: 12px;
+        }
+        Slider {
+            value: root.data.on_level;
+            minimum: 0;
+            maximum: 255;
+            changed(val) => {
+                root.data.on_level = val;
+                root.changed();
+            }
+        }
+        Text {
+            text: root.data.on_level;
+            color: #ccc;
+            width: 35px;
+            font-size: 12px;
+        }
+    }
+
+    CheckBox {
+        text: "Velocity Sensitive";
+        checked: root.data.velocity_sensitive;
+        toggled => {
+            root.data.velocity_sensitive = self.checked;
+            root.changed();
+        }
+    }
+}
