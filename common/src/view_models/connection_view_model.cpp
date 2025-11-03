@@ -1,6 +1,8 @@
 #include "gui_common/view_models/connection_view_model.h"
 #include "gui_common/log.h"
 
+#include <chrono>
+
 namespace gui::common
 {
 
@@ -84,6 +86,10 @@ bool ConnectionViewModel::connect(const std::string &portIdentifier)
         isCurrentlyConnected_ = true;
         connectionState_ = ConnectionState::WaitingForHeartBeatResponse;
         receivedTelemetryChannelCount_ = 0;
+        heartBeatState_ = HeartBeatState::Idle;
+        lastTelemetryReceivedMs_ = getTimeMs();
+        lastHeartBeatSentMs_ = 0;
+        heartBeatResponseDeadlineMs_ = 0;
     }
 
     GUI_LOG_INFO("ConnectionVM", "Backend connected, sending HeartBeat with forced telemetry request");
@@ -192,6 +198,13 @@ void ConnectionViewModel::handlePwmTelemetryReceived(const midi2pwm::pwm::Channe
     {
         std::lock_guard<std::mutex> stateLock(viewModelStateMutex_);
 
+        lastTelemetryReceivedMs_ = getTimeMs();
+
+        if (heartBeatState_ != HeartBeatState::Idle) {
+            GUI_LOG_INFO("ConnectionVM", "Telemetry received, resetting HeartBeat monitoring to idle");
+            heartBeatState_ = HeartBeatState::Idle;
+        }
+
         const char *stateNames[] = {"Disconnected", "WaitingForHeartBeatResponse", "WaitingForTelemetryData", "FullyConnected"};
         GUI_LOG_VERBOSE("ConnectionVM", "Current state: %s", stateNames[static_cast<int>(connectionState_)]);
 
@@ -214,6 +227,7 @@ void ConnectionViewModel::handlePwmTelemetryReceived(const midi2pwm::pwm::Channe
     if (shouldCheckConnectionState) {
         std::lock_guard<std::mutex> stateLock(viewModelStateMutex_);
         connectionState_ = ConnectionState::FullyConnected;
+        lastTelemetryReceivedMs_ = getTimeMs();
         GUI_LOG_INFO("ConnectionVM", "All telemetry data received - connection fully established");
 
         bool connectionStateCallbackIsRegistered = connectionStateChangedCallback_.is_valid();
@@ -231,9 +245,13 @@ void ConnectionViewModel::handleHeartBeatReceived(const midi2pwm::pwm::HeartBeat
     std::lock_guard<std::mutex> stateLock(viewModelStateMutex_);
 
     if (connectionState_ == ConnectionState::WaitingForHeartBeatResponse) {
-        GUI_LOG_INFO("ConnectionVM", "HeartBeat ACK received, transitioning to WaitingForTelemetryData state");
+        GUI_LOG_INFO("ConnectionVM", "Initial HeartBeat response received, transitioning to WaitingForTelemetryData state");
         connectionState_ = ConnectionState::WaitingForTelemetryData;
         receivedTelemetryChannelCount_ = 0;
+        lastTelemetryReceivedMs_ = getTimeMs();
+    } else if (connectionState_ == ConnectionState::FullyConnected && heartBeatState_ == HeartBeatState::WaitingForResponse) {
+        GUI_LOG_DEBUG("ConnectionVM", "HeartBeat response received, device is alive");
+        heartBeatState_ = HeartBeatState::Active;
     }
 }
 
@@ -278,6 +296,112 @@ bool ConnectionViewModel::sendChannelConfig(const midi2pwm::pwm::ChannelConfigT 
     }
 
     return messageProcessor_.sendChannelConfig(config);
+}
+
+uint32_t ConnectionViewModel::getTimeMs() const
+{
+    auto now = std::chrono::steady_clock::now();
+    auto duration = now.time_since_epoch();
+    return static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
+}
+
+void ConnectionViewModel::sendHeartBeat()
+{
+    GUI_LOG_DEBUG("ConnectionVM", "Sending HeartBeat");
+    constexpr bool REQUEST_TELEMETRY = false;
+
+    viewModelStateMutex_.unlock();
+    bool sent = messageProcessor_.sendHeartBeat(REQUEST_TELEMETRY);
+    viewModelStateMutex_.lock();
+
+    if (!sent) {
+        GUI_LOG_ERROR("ConnectionVM", "Failed to send HeartBeat - treating as connection lost");
+
+        if (isCurrentlyConnected_) {
+            isCurrentlyConnected_ = false;
+            connectionState_ = ConnectionState::Disconnected;
+            heartBeatState_ = HeartBeatState::Idle;
+
+            viewModelStateMutex_.unlock();
+
+            disconnect();
+
+            bool connectionStateCallbackIsRegistered = connectionStateChangedCallback_.is_valid();
+            if (connectionStateCallbackIsRegistered) {
+                constexpr bool NOW_DISCONNECTED = false;
+                connectionStateChangedCallback_(NOW_DISCONNECTED);
+            }
+
+            viewModelStateMutex_.lock();
+        }
+    }
+}
+
+void ConnectionViewModel::handleConnectionLost()
+{
+    GUI_LOG_ERROR("ConnectionVM", "Connection lost detected");
+
+    if (!isCurrentlyConnected_) {
+        return;
+    }
+
+    isCurrentlyConnected_ = false;
+    connectionState_ = ConnectionState::Disconnected;
+    heartBeatState_ = HeartBeatState::Idle;
+
+    viewModelStateMutex_.unlock();
+
+    disconnect();
+
+    bool connectionStateCallbackIsRegistered = connectionStateChangedCallback_.is_valid();
+    if (connectionStateCallbackIsRegistered) {
+        constexpr bool NOW_DISCONNECTED = false;
+        connectionStateChangedCallback_(NOW_DISCONNECTED);
+    }
+
+    viewModelStateMutex_.lock();
+}
+
+void ConnectionViewModel::update()
+{
+    std::lock_guard<std::mutex> stateLock(viewModelStateMutex_);
+
+    if (!isCurrentlyConnected_ || connectionState_ != ConnectionState::FullyConnected) {
+        return;
+    }
+
+    uint32_t currentTimeMs = getTimeMs();
+    uint32_t timeSinceLastTelemetryMs = currentTimeMs - lastTelemetryReceivedMs_;
+
+    switch (heartBeatState_) {
+        case HeartBeatState::Idle:
+            if (timeSinceLastTelemetryMs >= TELEMETRY_IDLE_TIMEOUT_MS) {
+                GUI_LOG_INFO("ConnectionVM", "No telemetry for %u ms, starting HeartBeat monitoring", timeSinceLastTelemetryMs);
+                heartBeatState_ = HeartBeatState::Active;
+                sendHeartBeat();
+                lastHeartBeatSentMs_ = currentTimeMs;
+                heartBeatResponseDeadlineMs_ = currentTimeMs + HEARTBEAT_RESPONSE_TIMEOUT_MS;
+                heartBeatState_ = HeartBeatState::WaitingForResponse;
+            }
+            break;
+
+        case HeartBeatState::Active:
+            if (currentTimeMs - lastHeartBeatSentMs_ >= HEARTBEAT_INTERVAL_MS) {
+                GUI_LOG_DEBUG("ConnectionVM", "Sending periodic HeartBeat");
+                sendHeartBeat();
+                lastHeartBeatSentMs_ = currentTimeMs;
+                heartBeatResponseDeadlineMs_ = currentTimeMs + HEARTBEAT_RESPONSE_TIMEOUT_MS;
+                heartBeatState_ = HeartBeatState::WaitingForResponse;
+            }
+            break;
+
+        case HeartBeatState::WaitingForResponse:
+            if (currentTimeMs >= heartBeatResponseDeadlineMs_) {
+                GUI_LOG_ERROR("ConnectionVM", "HeartBeat response timeout - connection lost");
+                handleConnectionLost();
+            }
+            break;
+    }
 }
 
 } // namespace gui::common
