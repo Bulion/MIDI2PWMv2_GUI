@@ -27,6 +27,49 @@ struct RampedModeData
     std::uint16_t release_time_ms;
 };
 
+struct PulseModeData
+{
+    std::uint8_t on_level;
+    bool velocity_sensitive;
+    std::uint16_t attack_time_ms;
+    std::uint16_t hold_time_ms;
+    std::uint16_t release_time_ms;
+};
+
+struct ToggleModeData
+{
+    std::uint8_t on_level;
+    bool velocity_sensitive;
+    std::uint16_t debounce_delay_ms;
+};
+
+struct ADSRModeData
+{
+    std::uint8_t attack_level;
+    std::uint8_t sustain_level;
+    bool velocity_sensitive;
+    std::uint16_t attack_time_ms;
+    std::uint16_t decay_time_ms;
+    std::uint16_t release_time_ms;
+};
+
+struct CCControlModeData
+{
+    std::uint8_t cc_number;
+    std::uint8_t center_value;
+    std::uint8_t left_max_pwm;
+    std::uint8_t right_max_pwm;
+    std::uint8_t deadband_range;
+};
+
+struct PitchBendModeData
+{
+    std::uint8_t base_level;
+    std::uint8_t bend_range;
+    bool unipolar;
+    bool velocity_sensitive;
+};
+
 struct ChannelData
 {
     etl::string<16> note;
@@ -36,6 +79,11 @@ struct ChannelData
     std::uint8_t mode_type;
     InstantModeData instant_data;
     RampedModeData ramped_data;
+    PulseModeData pulse_data;
+    ToggleModeData toggle_data;
+    ADSRModeData adsr_data;
+    CCControlModeData cc_data;
+    PitchBendModeData pitchbend_data;
 };
 
 class ChannelTelemetryViewModel

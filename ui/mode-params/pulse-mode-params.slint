@@ -1,0 +1,136 @@
+import { Slider, CheckBox } from "std-widgets.slint";
+
+export struct PulseModeData {
+    on_level: int,
+    velocity_sensitive: bool,
+    attack_time_ms: int,
+    hold_time_ms: int,
+    release_time_ms: int,
+}
+
+export component PulseModeParams inherits VerticalLayout {
+    in-out property <PulseModeData> data: {
+        on_level: 255,
+        velocity_sensitive: true,
+        attack_time_ms: 10,
+        hold_time_ms: 100,
+        release_time_ms: 50,
+    };
+
+    callback changed();
+
+    spacing: 6px;
+
+    HorizontalLayout {
+        spacing: 6px;
+        Text {
+            text: "On Level:";
+            color: #ccc;
+            vertical-alignment: center;
+            width: 70px;
+            font-size: 12px;
+        }
+        Slider {
+            value: root.data.on_level;
+            minimum: 0;
+            maximum: 255;
+            changed(val) => {
+                root.data.on_level = val;
+                root.changed();
+            }
+        }
+        Text {
+            text: root.data.on_level;
+            color: #ccc;
+            width: 35px;
+            font-size: 12px;
+        }
+    }
+
+    CheckBox {
+        text: "Velocity Sensitive";
+        checked: root.data.velocity_sensitive;
+        toggled => {
+            root.data.velocity_sensitive = self.checked;
+            root.changed();
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 6px;
+        Text {
+            text: "Attack:";
+            color: #ccc;
+            vertical-alignment: center;
+            width: 70px;
+            font-size: 12px;
+        }
+        Slider {
+            value: root.data.attack_time_ms;
+            minimum: 0;
+            maximum: 1000;
+            changed(val) => {
+                root.data.attack_time_ms = val;
+                root.changed();
+            }
+        }
+        Text {
+            text: root.data.attack_time_ms;
+            color: #ccc;
+            width: 35px;
+            font-size: 12px;
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 6px;
+        Text {
+            text: "Hold:";
+            color: #ccc;
+            vertical-alignment: center;
+            width: 70px;
+            font-size: 12px;
+        }
+        Slider {
+            value: root.data.hold_time_ms;
+            minimum: 0;
+            maximum: 1000;
+            changed(val) => {
+                root.data.hold_time_ms = val;
+                root.changed();
+            }
+        }
+        Text {
+            text: root.data.hold_time_ms;
+            color: #ccc;
+            width: 35px;
+            font-size: 12px;
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 6px;
+        Text {
+            text: "Release:";
+            color: #ccc;
+            vertical-alignment: center;
+            width: 70px;
+            font-size: 12px;
+        }
+        Slider {
+            value: root.data.release_time_ms;
+            minimum: 0;
+            maximum: 1000;
+            changed(val) => {
+                root.data.release_time_ms = val;
+                root.changed();
+            }
+        }
+        Text {
+            text: root.data.release_time_ms;
+            color: #ccc;
+            width: 35px;
+            font-size: 12px;
+        }
+    }
+}

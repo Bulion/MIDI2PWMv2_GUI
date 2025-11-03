@@ -1,0 +1,153 @@
+import { Slider } from "std-widgets.slint";
+
+export struct CCControlModeData {
+    cc_number: int,
+    center_value: int,
+    left_max_pwm: int,
+    right_max_pwm: int,
+    deadband_range: int,
+}
+
+export component CCControlModeParams inherits VerticalLayout {
+    in-out property <CCControlModeData> data: {
+        cc_number: 1,
+        center_value: 64,
+        left_max_pwm: 255,
+        right_max_pwm: 255,
+        deadband_range: 2,
+    };
+
+    callback changed();
+
+    spacing: 6px;
+
+    HorizontalLayout {
+        spacing: 6px;
+        Text {
+            text: "CC Number:";
+            color: #ccc;
+            vertical-alignment: center;
+            width: 90px;
+            font-size: 12px;
+        }
+        Slider {
+            value: root.data.cc_number;
+            minimum: 0;
+            maximum: 127;
+            changed(val) => {
+                root.data.cc_number = val;
+                root.changed();
+            }
+        }
+        Text {
+            text: root.data.cc_number;
+            color: #ccc;
+            width: 35px;
+            font-size: 12px;
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 6px;
+        Text {
+            text: "Center Value:";
+            color: #ccc;
+            vertical-alignment: center;
+            width: 90px;
+            font-size: 12px;
+        }
+        Slider {
+            value: root.data.center_value;
+            minimum: 0;
+            maximum: 127;
+            changed(val) => {
+                root.data.center_value = val;
+                root.changed();
+            }
+        }
+        Text {
+            text: root.data.center_value;
+            color: #ccc;
+            width: 35px;
+            font-size: 12px;
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 6px;
+        Text {
+            text: "Left Max:";
+            color: #ccc;
+            vertical-alignment: center;
+            width: 90px;
+            font-size: 12px;
+        }
+        Slider {
+            value: root.data.left_max_pwm;
+            minimum: 0;
+            maximum: 255;
+            changed(val) => {
+                root.data.left_max_pwm = val;
+                root.changed();
+            }
+        }
+        Text {
+            text: root.data.left_max_pwm;
+            color: #ccc;
+            width: 35px;
+            font-size: 12px;
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 6px;
+        Text {
+            text: "Right Max:";
+            color: #ccc;
+            vertical-alignment: center;
+            width: 90px;
+            font-size: 12px;
+        }
+        Slider {
+            value: root.data.right_max_pwm;
+            minimum: 0;
+            maximum: 255;
+            changed(val) => {
+                root.data.right_max_pwm = val;
+                root.changed();
+            }
+        }
+        Text {
+            text: root.data.right_max_pwm;
+            color: #ccc;
+            width: 35px;
+            font-size: 12px;
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 6px;
+        Text {
+            text: "Deadband:";
+            color: #ccc;
+            vertical-alignment: center;
+            width: 90px;
+            font-size: 12px;
+        }
+        Slider {
+            value: root.data.deadband_range;
+            minimum: 0;
+            maximum: 20;
+            changed(val) => {
+                root.data.deadband_range = val;
+                root.changed();
+            }
+        }
+        Text {
+            text: root.data.deadband_range;
+            color: #ccc;
+            width: 35px;
+            font-size: 12px;
+        }
+    }
+}

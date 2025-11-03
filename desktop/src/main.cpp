@@ -105,6 +105,29 @@ struct DesktopController
                 slintChannelData.ramped_data.velocity_sensitive = channelData.ramped_data.velocity_sensitive;
                 slintChannelData.ramped_data.attack_time_ms = channelData.ramped_data.attack_time_ms;
                 slintChannelData.ramped_data.release_time_ms = channelData.ramped_data.release_time_ms;
+                slintChannelData.pulse_data.on_level = channelData.pulse_data.on_level;
+                slintChannelData.pulse_data.velocity_sensitive = channelData.pulse_data.velocity_sensitive;
+                slintChannelData.pulse_data.attack_time_ms = channelData.pulse_data.attack_time_ms;
+                slintChannelData.pulse_data.hold_time_ms = channelData.pulse_data.hold_time_ms;
+                slintChannelData.pulse_data.release_time_ms = channelData.pulse_data.release_time_ms;
+                slintChannelData.toggle_data.on_level = channelData.toggle_data.on_level;
+                slintChannelData.toggle_data.velocity_sensitive = channelData.toggle_data.velocity_sensitive;
+                slintChannelData.toggle_data.debounce_delay_ms = channelData.toggle_data.debounce_delay_ms;
+                slintChannelData.adsr_data.attack_level = channelData.adsr_data.attack_level;
+                slintChannelData.adsr_data.sustain_level = channelData.adsr_data.sustain_level;
+                slintChannelData.adsr_data.velocity_sensitive = channelData.adsr_data.velocity_sensitive;
+                slintChannelData.adsr_data.attack_time_ms = channelData.adsr_data.attack_time_ms;
+                slintChannelData.adsr_data.decay_time_ms = channelData.adsr_data.decay_time_ms;
+                slintChannelData.adsr_data.release_time_ms = channelData.adsr_data.release_time_ms;
+                slintChannelData.cc_data.cc_number = channelData.cc_data.cc_number;
+                slintChannelData.cc_data.center_value = channelData.cc_data.center_value;
+                slintChannelData.cc_data.left_max_pwm = channelData.cc_data.left_max_pwm;
+                slintChannelData.cc_data.right_max_pwm = channelData.cc_data.right_max_pwm;
+                slintChannelData.cc_data.deadband_range = channelData.cc_data.deadband_range;
+                slintChannelData.pitchbend_data.base_level = channelData.pitchbend_data.base_level;
+                slintChannelData.pitchbend_data.bend_range = channelData.pitchbend_data.bend_range;
+                slintChannelData.pitchbend_data.unipolar = channelData.pitchbend_data.unipolar;
+                slintChannelData.pitchbend_data.velocity_sensitive = channelData.pitchbend_data.velocity_sensitive;
                 model->push_back(slintChannelData);
             }
 
@@ -276,6 +299,59 @@ int main()
                 ramped_params->release_time_ms = static_cast<uint16_t>(mode_config.ramped_data.release_time_ms);
                 config.mode_params.type = midi2pwm::pwm::ModeParametersUnion::RampedModeParams;
                 config.mode_params.value = ramped_params.release();
+                break;
+            }
+            case 2: {
+                auto pulse_params = std::make_unique<midi2pwm::pwm::PulseModeParamsT>();
+                pulse_params->on_level = static_cast<uint8_t>(mode_config.pulse_data.on_level);
+                pulse_params->velocity_sensitive = mode_config.pulse_data.velocity_sensitive;
+                pulse_params->attack_time_ms = static_cast<uint16_t>(mode_config.pulse_data.attack_time_ms);
+                pulse_params->hold_time_ms = static_cast<uint16_t>(mode_config.pulse_data.hold_time_ms);
+                pulse_params->release_time_ms = static_cast<uint16_t>(mode_config.pulse_data.release_time_ms);
+                config.mode_params.type = midi2pwm::pwm::ModeParametersUnion::PulseModeParams;
+                config.mode_params.value = pulse_params.release();
+                break;
+            }
+            case 3: {
+                auto toggle_params = std::make_unique<midi2pwm::pwm::ToggleModeParamsT>();
+                toggle_params->on_level = static_cast<uint8_t>(mode_config.toggle_data.on_level);
+                toggle_params->velocity_sensitive = mode_config.toggle_data.velocity_sensitive;
+                toggle_params->debounce_delay_ms = static_cast<uint16_t>(mode_config.toggle_data.debounce_delay_ms);
+                config.mode_params.type = midi2pwm::pwm::ModeParametersUnion::ToggleModeParams;
+                config.mode_params.value = toggle_params.release();
+                break;
+            }
+            case 4: {
+                auto adsr_params = std::make_unique<midi2pwm::pwm::ADSRModeParamsT>();
+                adsr_params->attack_level = static_cast<uint8_t>(mode_config.adsr_data.attack_level);
+                adsr_params->sustain_level = static_cast<uint8_t>(mode_config.adsr_data.sustain_level);
+                adsr_params->velocity_sensitive = mode_config.adsr_data.velocity_sensitive;
+                adsr_params->attack_time_ms = static_cast<uint16_t>(mode_config.adsr_data.attack_time_ms);
+                adsr_params->decay_time_ms = static_cast<uint16_t>(mode_config.adsr_data.decay_time_ms);
+                adsr_params->release_time_ms = static_cast<uint16_t>(mode_config.adsr_data.release_time_ms);
+                config.mode_params.type = midi2pwm::pwm::ModeParametersUnion::ADSRModeParams;
+                config.mode_params.value = adsr_params.release();
+                break;
+            }
+            case 5: {
+                auto cc_params = std::make_unique<midi2pwm::pwm::CCControlModeParamsT>();
+                cc_params->cc_number = static_cast<uint8_t>(mode_config.cc_data.cc_number);
+                cc_params->center_value = static_cast<uint8_t>(mode_config.cc_data.center_value);
+                cc_params->left_max_pwm = static_cast<uint8_t>(mode_config.cc_data.left_max_pwm);
+                cc_params->right_max_pwm = static_cast<uint8_t>(mode_config.cc_data.right_max_pwm);
+                cc_params->deadband_range = static_cast<uint8_t>(mode_config.cc_data.deadband_range);
+                config.mode_params.type = midi2pwm::pwm::ModeParametersUnion::CCControlModeParams;
+                config.mode_params.value = cc_params.release();
+                break;
+            }
+            case 6: {
+                auto pitchbend_params = std::make_unique<midi2pwm::pwm::PitchBendModeParamsT>();
+                pitchbend_params->base_level = static_cast<uint8_t>(mode_config.pitchbend_data.base_level);
+                pitchbend_params->bend_range = static_cast<uint8_t>(mode_config.pitchbend_data.bend_range);
+                pitchbend_params->unipolar = mode_config.pitchbend_data.unipolar;
+                pitchbend_params->velocity_sensitive = mode_config.pitchbend_data.velocity_sensitive;
+                config.mode_params.type = midi2pwm::pwm::ModeParametersUnion::PitchBendModeParams;
+                config.mode_params.value = pitchbend_params.release();
                 break;
             }
             default:

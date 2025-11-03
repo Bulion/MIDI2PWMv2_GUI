@@ -55,6 +55,49 @@ void ChannelTelemetryViewModel::updateFromTelemetry(const midi2pwm::pwm::Channel
                 channelData.ramped_data.attack_time_ms = rampedParams->attack_time_ms();
                 channelData.ramped_data.release_time_ms = rampedParams->release_time_ms();
             }
+        } else if (modeParamsType == midi2pwm::pwm::ModeParametersUnion::PulseModeParams) {
+            const auto* pulseParams = telemetry.mode_params_as_PulseModeParams();
+            if (pulseParams != nullptr) {
+                channelData.pulse_data.on_level = pulseParams->on_level();
+                channelData.pulse_data.velocity_sensitive = pulseParams->velocity_sensitive();
+                channelData.pulse_data.attack_time_ms = pulseParams->attack_time_ms();
+                channelData.pulse_data.hold_time_ms = pulseParams->hold_time_ms();
+                channelData.pulse_data.release_time_ms = pulseParams->release_time_ms();
+            }
+        } else if (modeParamsType == midi2pwm::pwm::ModeParametersUnion::ToggleModeParams) {
+            const auto* toggleParams = telemetry.mode_params_as_ToggleModeParams();
+            if (toggleParams != nullptr) {
+                channelData.toggle_data.on_level = toggleParams->on_level();
+                channelData.toggle_data.velocity_sensitive = toggleParams->velocity_sensitive();
+                channelData.toggle_data.debounce_delay_ms = toggleParams->debounce_delay_ms();
+            }
+        } else if (modeParamsType == midi2pwm::pwm::ModeParametersUnion::ADSRModeParams) {
+            const auto* adsrParams = telemetry.mode_params_as_ADSRModeParams();
+            if (adsrParams != nullptr) {
+                channelData.adsr_data.attack_level = adsrParams->attack_level();
+                channelData.adsr_data.sustain_level = adsrParams->sustain_level();
+                channelData.adsr_data.velocity_sensitive = adsrParams->velocity_sensitive();
+                channelData.adsr_data.attack_time_ms = adsrParams->attack_time_ms();
+                channelData.adsr_data.decay_time_ms = adsrParams->decay_time_ms();
+                channelData.adsr_data.release_time_ms = adsrParams->release_time_ms();
+            }
+        } else if (modeParamsType == midi2pwm::pwm::ModeParametersUnion::CCControlModeParams) {
+            const auto* ccParams = telemetry.mode_params_as_CCControlModeParams();
+            if (ccParams != nullptr) {
+                channelData.cc_data.cc_number = ccParams->cc_number();
+                channelData.cc_data.center_value = ccParams->center_value();
+                channelData.cc_data.left_max_pwm = ccParams->left_max_pwm();
+                channelData.cc_data.right_max_pwm = ccParams->right_max_pwm();
+                channelData.cc_data.deadband_range = ccParams->deadband_range();
+            }
+        } else if (modeParamsType == midi2pwm::pwm::ModeParametersUnion::PitchBendModeParams) {
+            const auto* pitchbendParams = telemetry.mode_params_as_PitchBendModeParams();
+            if (pitchbendParams != nullptr) {
+                channelData.pitchbend_data.base_level = pitchbendParams->base_level();
+                channelData.pitchbend_data.bend_range = pitchbendParams->bend_range();
+                channelData.pitchbend_data.unipolar = pitchbendParams->unipolar();
+                channelData.pitchbend_data.velocity_sensitive = pitchbendParams->velocity_sensitive();
+            }
         }
 
         GUI_LOG_DEBUG(TAG, "Channel %u: note=%s, voltage=%.1fV, current=%.1fmA, status=%s",
@@ -86,6 +129,11 @@ void ChannelTelemetryViewModel::clear()
             channelData.mode_type = 0;
             channelData.instant_data = {255, true};
             channelData.ramped_data = {255, true, 100, 100};
+            channelData.pulse_data = {255, true, 10, 100, 50};
+            channelData.toggle_data = {255, false, 50};
+            channelData.adsr_data = {255, 200, true, 50, 100, 200};
+            channelData.cc_data = {1, 64, 255, 255, 2};
+            channelData.pitchbend_data = {128, 64, false, true};
         }
 
         callback = updateCallback_;

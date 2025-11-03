@@ -1,0 +1,91 @@
+import { Slider, CheckBox } from "std-widgets.slint";
+
+export struct PitchBendModeData {
+    base_level: int,
+    bend_range: int,
+    unipolar: bool,
+    velocity_sensitive: bool,
+}
+
+export component PitchBendModeParams inherits VerticalLayout {
+    in-out property <PitchBendModeData> data: {
+        base_level: 128,
+        bend_range: 64,
+        unipolar: false,
+        velocity_sensitive: true,
+    };
+
+    callback changed();
+
+    spacing: 6px;
+
+    HorizontalLayout {
+        spacing: 6px;
+        Text {
+            text: "Base Level:";
+            color: #ccc;
+            vertical-alignment: center;
+            width: 90px;
+            font-size: 12px;
+        }
+        Slider {
+            value: root.data.base_level;
+            minimum: 0;
+            maximum: 255;
+            changed(val) => {
+                root.data.base_level = val;
+                root.changed();
+            }
+        }
+        Text {
+            text: root.data.base_level;
+            color: #ccc;
+            width: 35px;
+            font-size: 12px;
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 6px;
+        Text {
+            text: "Bend Range:";
+            color: #ccc;
+            vertical-alignment: center;
+            width: 90px;
+            font-size: 12px;
+        }
+        Slider {
+            value: root.data.bend_range;
+            minimum: 0;
+            maximum: 255;
+            changed(val) => {
+                root.data.bend_range = val;
+                root.changed();
+            }
+        }
+        Text {
+            text: root.data.bend_range;
+            color: #ccc;
+            width: 35px;
+            font-size: 12px;
+        }
+    }
+
+    CheckBox {
+        text: "Unipolar Mode";
+        checked: root.data.unipolar;
+        toggled => {
+            root.data.unipolar = self.checked;
+            root.changed();
+        }
+    }
+
+    CheckBox {
+        text: "Velocity Sensitive";
+        checked: root.data.velocity_sensitive;
+        toggled => {
+            root.data.velocity_sensitive = self.checked;
+            root.changed();
+        }
+    }
+}

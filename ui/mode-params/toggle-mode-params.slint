@@ -1,0 +1,80 @@
+import { Slider, CheckBox } from "std-widgets.slint";
+
+export struct ToggleModeData {
+    on_level: int,
+    velocity_sensitive: bool,
+    debounce_delay_ms: int,
+}
+
+export component ToggleModeParams inherits VerticalLayout {
+    in-out property <ToggleModeData> data: {
+        on_level: 255,
+        velocity_sensitive: false,
+        debounce_delay_ms: 50,
+    };
+
+    callback changed();
+
+    spacing: 6px;
+
+    HorizontalLayout {
+        spacing: 6px;
+        Text {
+            text: "On Level:";
+            color: #ccc;
+            vertical-alignment: center;
+            width: 70px;
+            font-size: 12px;
+        }
+        Slider {
+            value: root.data.on_level;
+            minimum: 0;
+            maximum: 255;
+            changed(val) => {
+                root.data.on_level = val;
+                root.changed();
+            }
+        }
+        Text {
+            text: root.data.on_level;
+            color: #ccc;
+            width: 35px;
+            font-size: 12px;
+        }
+    }
+
+    CheckBox {
+        text: "Velocity Sensitive";
+        checked: root.data.velocity_sensitive;
+        toggled => {
+            root.data.velocity_sensitive = self.checked;
+            root.changed();
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 6px;
+        Text {
+            text: "Debounce:";
+            color: #ccc;
+            vertical-alignment: center;
+            width: 70px;
+            font-size: 12px;
+        }
+        Slider {
+            value: root.data.debounce_delay_ms;
+            minimum: 0;
+            maximum: 500;
+            changed(val) => {
+                root.data.debounce_delay_ms = val;
+                root.changed();
+            }
+        }
+        Text {
+            text: root.data.debounce_delay_ms;
+            color: #ccc;
+            width: 35px;
+            font-size: 12px;
+        }
+    }
+}

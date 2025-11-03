@@ -1,0 +1,164 @@
+import { Slider, CheckBox } from "std-widgets.slint";
+
+export struct ADSRModeData {
+    attack_level: int,
+    sustain_level: int,
+    velocity_sensitive: bool,
+    attack_time_ms: int,
+    decay_time_ms: int,
+    release_time_ms: int,
+}
+
+export component ADSRModeParams inherits VerticalLayout {
+    in-out property <ADSRModeData> data: {
+        attack_level: 255,
+        sustain_level: 200,
+        velocity_sensitive: true,
+        attack_time_ms: 50,
+        decay_time_ms: 100,
+        release_time_ms: 200,
+    };
+
+    callback changed();
+
+    spacing: 6px;
+
+    HorizontalLayout {
+        spacing: 6px;
+        Text {
+            text: "Attack Level:";
+            color: #ccc;
+            vertical-alignment: center;
+            width: 90px;
+            font-size: 12px;
+        }
+        Slider {
+            value: root.data.attack_level;
+            minimum: 0;
+            maximum: 255;
+            changed(val) => {
+                root.data.attack_level = val;
+                root.changed();
+            }
+        }
+        Text {
+            text: root.data.attack_level;
+            color: #ccc;
+            width: 35px;
+            font-size: 12px;
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 6px;
+        Text {
+            text: "Sustain Level:";
+            color: #ccc;
+            vertical-alignment: center;
+            width: 90px;
+            font-size: 12px;
+        }
+        Slider {
+            value: root.data.sustain_level;
+            minimum: 0;
+            maximum: 255;
+            changed(val) => {
+                root.data.sustain_level = val;
+                root.changed();
+            }
+        }
+        Text {
+            text: root.data.sustain_level;
+            color: #ccc;
+            width: 35px;
+            font-size: 12px;
+        }
+    }
+
+    CheckBox {
+        text: "Velocity Sensitive";
+        checked: root.data.velocity_sensitive;
+        toggled => {
+            root.data.velocity_sensitive = self.checked;
+            root.changed();
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 6px;
+        Text {
+            text: "Attack:";
+            color: #ccc;
+            vertical-alignment: center;
+            width: 90px;
+            font-size: 12px;
+        }
+        Slider {
+            value: root.data.attack_time_ms;
+            minimum: 0;
+            maximum: 1000;
+            changed(val) => {
+                root.data.attack_time_ms = val;
+                root.changed();
+            }
+        }
+        Text {
+            text: root.data.attack_time_ms;
+            color: #ccc;
+            width: 35px;
+            font-size: 12px;
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 6px;
+        Text {
+            text: "Decay:";
+            color: #ccc;
+            vertical-alignment: center;
+            width: 90px;
+            font-size: 12px;
+        }
+        Slider {
+            value: root.data.decay_time_ms;
+            minimum: 0;
+            maximum: 1000;
+            changed(val) => {
+                root.data.decay_time_ms = val;
+                root.changed();
+            }
+        }
+        Text {
+            text: root.data.decay_time_ms;
+            color: #ccc;
+            width: 35px;
+            font-size: 12px;
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 6px;
+        Text {
+            text: "Release:";
+            color: #ccc;
+            vertical-alignment: center;
+            width: 90px;
+            font-size: 12px;
+        }
+        Slider {
+            value: root.data.release_time_ms;
+            minimum: 0;
+            maximum: 1000;
+            changed(val) => {
+                root.data.release_time_ms = val;
+                root.changed();
+            }
+        }
+        Text {
+            text: root.data.release_time_ms;
+            color: #ccc;
+            width: 35px;
+            font-size: 12px;
+        }
+    }
+}

@@ -1,11 +1,21 @@
 import { Button, SpinBox, Slider, ComboBox, CheckBox } from "std-widgets.slint";
 import { InstantModeParams, InstantModeData } from "mode-params/instant-mode-params.slint";
 import { RampedModeParams, RampedModeData } from "mode-params/ramped-mode-params.slint";
+import { PulseModeParams, PulseModeData } from "mode-params/pulse-mode-params.slint";
+import { ToggleModeParams, ToggleModeData } from "mode-params/toggle-mode-params.slint";
+import { ADSRModeParams, ADSRModeData } from "mode-params/adsr-mode-params.slint";
+import { CCControlModeParams, CCControlModeData } from "mode-params/cc-control-mode-params.slint";
+import { PitchBendModeParams, PitchBendModeData } from "mode-params/pitchbend-mode-params.slint";
 
 export struct ModeConfig {
     mode_type: int,
     instant_data: InstantModeData,
     ramped_data: RampedModeData,
+    pulse_data: PulseModeData,
+    toggle_data: ToggleModeData,
+    adsr_data: ADSRModeData,
+    cc_data: CCControlModeData,
+    pitchbend_data: PitchBendModeData,
 }
 
 component ConfirmDialog inherits Rectangle {
@@ -78,6 +88,11 @@ export component ChannelConfigPopup inherits Rectangle {
         mode_type: 0,
         instant_data: { on_level: 255, velocity_sensitive: true },
         ramped_data: { on_level: 255, velocity_sensitive: true, attack_time_ms: 100, release_time_ms: 100 },
+        pulse_data: { on_level: 255, velocity_sensitive: true, attack_time_ms: 10, hold_time_ms: 100, release_time_ms: 50 },
+        toggle_data: { on_level: 255, velocity_sensitive: false, debounce_delay_ms: 50 },
+        adsr_data: { attack_level: 255, sustain_level: 200, velocity_sensitive: true, attack_time_ms: 50, decay_time_ms: 100, release_time_ms: 200 },
+        cc_data: { cc_number: 1, center_value: 64, left_max_pwm: 255, right_max_pwm: 255, deadband_range: 2 },
+        pitchbend_data: { base_level: 128, bend_range: 64, unipolar: false, velocity_sensitive: true },
     };
 
     callback assign_note;
@@ -286,6 +301,46 @@ export component ChannelConfigPopup inherits Rectangle {
                 data: root.mode_config.ramped_data;
                 changed => {
                     root.mode_config.ramped_data = self.data;
+                    root.is_dirty = true;
+                }
+            }
+
+            if root.mode_config.mode_type == 2: PulseModeParams {
+                data: root.mode_config.pulse_data;
+                changed => {
+                    root.mode_config.pulse_data = self.data;
+                    root.is_dirty = true;
+                }
+            }
+
+            if root.mode_config.mode_type == 3: ToggleModeParams {
+                data: root.mode_config.toggle_data;
+                changed => {
+                    root.mode_config.toggle_data = self.data;
+                    root.is_dirty = true;
+                }
+            }
+
+            if root.mode_config.mode_type == 4: ADSRModeParams {
+                data: root.mode_config.adsr_data;
+                changed => {
+                    root.mode_config.adsr_data = self.data;
+                    root.is_dirty = true;
+                }
+            }
+
+            if root.mode_config.mode_type == 5: CCControlModeParams {
+                data: root.mode_config.cc_data;
+                changed => {
+                    root.mode_config.cc_data = self.data;
+                    root.is_dirty = true;
+                }
+            }
+
+            if root.mode_config.mode_type == 6: PitchBendModeParams {
+                data: root.mode_config.pitchbend_data;
+                changed => {
+                    root.mode_config.pitchbend_data = self.data;
                     root.is_dirty = true;
                 }
             }
