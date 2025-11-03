@@ -97,10 +97,14 @@ struct DesktopController
                 slintChannelData.note = slint::SharedString(channelData.note.c_str());
                 slintChannelData.voltage = channelData.voltage;
                 slintChannelData.current = channelData.current;
-                slintChannelData.min_value = channelData.minValue;
-                slintChannelData.max_value = channelData.maxValue;
-                slintChannelData.middle_value = channelData.middleValue;
                 slintChannelData.fault = slint::SharedString(channelData.fault.c_str());
+                slintChannelData.mode_type = channelData.mode_type;
+                slintChannelData.instant_data.on_level = channelData.instant_data.on_level;
+                slintChannelData.instant_data.velocity_sensitive = channelData.instant_data.velocity_sensitive;
+                slintChannelData.ramped_data.on_level = channelData.ramped_data.on_level;
+                slintChannelData.ramped_data.velocity_sensitive = channelData.ramped_data.velocity_sensitive;
+                slintChannelData.ramped_data.attack_time_ms = channelData.ramped_data.attack_time_ms;
+                slintChannelData.ramped_data.release_time_ms = channelData.ramped_data.release_time_ms;
                 model->push_back(slintChannelData);
             }
 
@@ -233,8 +237,7 @@ int main()
         }
     });
 
-    app->on_save_channel_config([&connection_view_model, app](int channel_idx, slint::SharedString note_str,
-                                                         float min_val, float middle_val, float max_val) {
+    app->on_save_channel_config([&connection_view_model, app](int channel_idx, slint::SharedString note_str, ModeConfig mode_config) {
         GUI_LOG_INFO("SaveConfig", "Callback invoked for channel %d", channel_idx);
 
         uint16_t note_number = 255;
@@ -250,12 +253,38 @@ int main()
         config.channel_number = static_cast<uint16_t>(channel_idx);
         config.configuration = midi2pwm::pwm::ChannelConfiguration::FullBridge;
         config.note = note_number;
-        config.min_point = min_val;
-        config.midpoint = middle_val;
-        config.max_point = max_val;
+        config.min_point = 0.0F;
+        config.midpoint = 0.0F;
+        config.max_point = 0.0F;
 
-        GUI_LOG_INFO("SaveConfig", "Sending config: ch=%u, note=%u, min=%f, mid=%f, max=%f",
-                     config.channel_number, config.note, config.min_point, config.midpoint, config.max_point);
+        config.output_mode = static_cast<midi2pwm::pwm::OutputModeType>(mode_config.mode_type);
+
+        switch (mode_config.mode_type) {
+            case 0: {
+                auto instant_params = std::make_unique<midi2pwm::pwm::InstantModeParamsT>();
+                instant_params->on_level = static_cast<uint8_t>(mode_config.instant_data.on_level);
+                instant_params->velocity_sensitive = mode_config.instant_data.velocity_sensitive;
+                config.mode_params.type = midi2pwm::pwm::ModeParametersUnion::InstantModeParams;
+                config.mode_params.value = instant_params.release();
+                break;
+            }
+            case 1: {
+                auto ramped_params = std::make_unique<midi2pwm::pwm::RampedModeParamsT>();
+                ramped_params->on_level = static_cast<uint8_t>(mode_config.ramped_data.on_level);
+                ramped_params->velocity_sensitive = mode_config.ramped_data.velocity_sensitive;
+                ramped_params->attack_time_ms = static_cast<uint16_t>(mode_config.ramped_data.attack_time_ms);
+                ramped_params->release_time_ms = static_cast<uint16_t>(mode_config.ramped_data.release_time_ms);
+                config.mode_params.type = midi2pwm::pwm::ModeParametersUnion::RampedModeParams;
+                config.mode_params.value = ramped_params.release();
+                break;
+            }
+            default:
+                GUI_LOG_WARNING("SaveConfig", "Unsupported mode type: %d", mode_config.mode_type);
+                break;
+        }
+
+        GUI_LOG_INFO("SaveConfig", "Sending config: ch=%u, note=%u, mode=%d",
+                     config.channel_number, config.note, mode_config.mode_type);
 
         bool success = connection_view_model.sendChannelConfig(config);
 
