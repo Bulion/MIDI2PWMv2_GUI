@@ -1,0 +1,6 @@
+dependencies:
+  idf:
+    version: ">=5.0.0"
+  slint/slint: @SLINT_VERSION@
+  espressif/tinyusb: 0.18.0~3
+  espressif/esp_lcd_touch_gt911: ==1.1.1

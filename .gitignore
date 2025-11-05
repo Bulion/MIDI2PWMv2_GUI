@@ -1,5 +1,5 @@
 # Build directories
-/build/
+/build*
 /esp32/build/
 /desktop/build/
 /web/build/
@@ -16,7 +16,7 @@
 # ESP-IDF/managed component locks & configs (generated)
 /esp32/managed_components
 /esp32/dependencies.lock
-/esp32/sdkconfig
+/esp32/main/idf_component.yml
 /esp32/sdkconfig.old
 
 # Node.js artefacts for web backend
