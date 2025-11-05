@@ -1,6 +1,8 @@
 #include "gui_common/message_processor.h"
 #include "gui_common/log.h"
 
+#include <inttypes.h>
+
 namespace gui::common
 {
 
@@ -304,11 +306,11 @@ void MessageProcessor::HandleResponse(const midi2pwm::pwm::Response &response)
 {
     const char *statusString = (response.status() == midi2pwm::pwm::ResponseStatus::ACK) ? "ACK" : "NACK";
 
-    GUI_LOG_INFO("MessageProcessor", "Response received: status=%s, error_code=%u",
+    GUI_LOG_INFO("MessageProcessor", "Response received: status=%s, error_code=%" PRIu32,
                  statusString, response.error_code());
 
     if (response.status() == midi2pwm::pwm::ResponseStatus::NACK) {
-        GUI_LOG_WARNING("MessageProcessor", "Command was rejected (NACK) with error_code=%u", response.error_code());
+        GUI_LOG_WARNING("MessageProcessor", "Command was rejected (NACK) with error_code=%" PRIu32, response.error_code());
     }
 
     if (!responseCallback_.is_valid()) {

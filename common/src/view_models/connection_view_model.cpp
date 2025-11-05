@@ -2,6 +2,7 @@
 #include "gui_common/log.h"
 
 #include <chrono>
+#include <inttypes.h>
 
 namespace gui::common
 {
@@ -259,11 +260,11 @@ void ConnectionViewModel::handleResponseReceived(const midi2pwm::pwm::Response &
 {
     const char *statusString = (response.status() == midi2pwm::pwm::ResponseStatus::ACK) ? "ACK" : "NACK";
 
-    GUI_LOG_INFO("ConnectionVM", "Command Response received: status=%s, error_code=%u",
+    GUI_LOG_INFO("ConnectionVM", "Command Response received: status=%s, error_code=%" PRIu32,
                  statusString, response.error_code());
 
     if (response.status() == midi2pwm::pwm::ResponseStatus::NACK) {
-        GUI_LOG_ERROR("ConnectionVM", "Device rejected command with error_code=%u", response.error_code());
+        GUI_LOG_ERROR("ConnectionVM", "Device rejected command with error_code=%" PRIu32, response.error_code());
     }
 
     std::lock_guard<std::mutex> stateLock(viewModelStateMutex_);
@@ -376,7 +377,7 @@ void ConnectionViewModel::update()
     switch (heartBeatState_) {
         case HeartBeatState::Idle:
             if (timeSinceLastTelemetryMs >= TELEMETRY_IDLE_TIMEOUT_MS) {
-                GUI_LOG_INFO("ConnectionVM", "No telemetry for %u ms, starting HeartBeat monitoring", timeSinceLastTelemetryMs);
+                GUI_LOG_INFO("ConnectionVM", "No telemetry for %" PRIu32 " ms, starting HeartBeat monitoring", timeSinceLastTelemetryMs);
                 heartBeatState_ = HeartBeatState::Active;
                 sendHeartBeat();
                 lastHeartBeatSentMs_ = currentTimeMs;
