@@ -57,7 +57,7 @@ public:
 private:
     static constexpr std::size_t EXPECTED_CHANNEL_COUNT = 16;
     static constexpr uint32_t TELEMETRY_IDLE_TIMEOUT_MS = 5000;
-    static constexpr uint32_t HEARTBEAT_INTERVAL_MS = 500;
+    static constexpr uint32_t HEARTBEAT_INTERVAL_MS = 2000;
     static constexpr uint32_t HEARTBEAT_RESPONSE_TIMEOUT_MS = 1000;
 
     bool writeToBackend(const std::uint8_t *data, std::size_t size);
