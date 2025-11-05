@@ -1,6 +1,4 @@
-set(LIBCOMM_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../../libcomm ${CMAKE_BINARY_DIR}/libcomm-esp32)
-add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../../common ${CMAKE_BINARY_DIR}/gui_common-esp32)
+set(GUI_UI_DIR "${CMAKE_CURRENT_LIST_DIR}/../../ui")
 
 idf_component_register(
     SRCS
@@ -14,13 +12,9 @@ idf_component_register(
         slint
 )
 
-set(GUI_UI_DIR "${CMAKE_CURRENT_LIST_DIR}/../../ui")
+target_link_libraries(${COMPONENT_LIB} PRIVATE gui_common libcomm)
 
-slint_target_sources(
-    ${COMPONENT_LIB}
-        ${GUI_UI_DIR}/app-window.slint
-)
+slint_target_sources(${COMPONENT_LIB} ${GUI_UI_DIR}/app-window.slint)
 
-target_link_libraries(${COMPONENT_LIB} PRIVATE gui_common)
-
-    
+idf_component_get_property(tusb_lib espressif__tinyusb COMPONENT_LIB)
+target_include_directories(${tusb_lib} PRIVATE "${CMAKE_CURRENT_LIST_DIR}/tinyusb_config")
