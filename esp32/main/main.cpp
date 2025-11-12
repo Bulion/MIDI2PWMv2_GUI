@@ -109,7 +109,7 @@ extern "C" void app_main(void)
             controller));
 
     app->set_show_connection_screen(false);
-    app->set_waiting_for_device_data(true);
+    app->set_waiting_for_device_data(false);
     app->set_connection_status("Connecting to device...");
     app->set_midi_message("No midi message received yet");
 
