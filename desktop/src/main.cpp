@@ -26,6 +26,7 @@ struct DesktopController
     MidiMessageViewModel &midi_view_model;
     std::atomic<bool> is_assigning_note{false};
     std::atomic<int> channel_awaiting_note{-1};
+    std::atomic<bool> is_assigning_cc{false};
     std::vector<gui::common::PortInfo> cached_ports;
 
     void OnMidiMessage(const midi2pwm::midi::ChannelMessageT &message)
@@ -37,7 +38,7 @@ struct DesktopController
                         static_cast<int>(message.message_type), message.channel, message.data1, message.data2);
 
         if (is_assigning_note.load()) {
-            GUI_LOG_DEBUG("Assignment", "Processing MIDI during assignment mode: is_note=%d, data1=%u",
+            GUI_LOG_DEBUG("Assignment", "Processing MIDI during note assignment mode: is_note=%d, data1=%u",
                           is_note_message, message.data1);
 
             if (is_note_message && message.data1 <= 127) {
@@ -64,6 +65,30 @@ struct DesktopController
                                   static_cast<int>(message.message_type));
                 } else {
                     GUI_LOG_WARNING("Assignment", "Received out-of-range note during assignment: %u", message.data1);
+                }
+            }
+        } else if (is_assigning_cc.load()) {
+            bool is_cc_message = (message.message_type == midi2pwm::midi::ChannelMessageType::ControlChange);
+
+            GUI_LOG_DEBUG("Assignment", "Processing MIDI during CC assignment mode: is_cc=%d, cc_num=%u",
+                          is_cc_message, message.data1);
+
+            if (is_cc_message && message.data1 <= 127) {
+                is_assigning_cc.store(false);
+                int cc_number = static_cast<int>(message.data1);
+
+                GUI_LOG_INFO("Assignment", "Assigning CC number %d", cc_number);
+
+                slint::invoke_from_event_loop([handle = app, cc_number]() {
+                    GUI_LOG_DEBUG("Assignment", "Invoking cc_assigned_from_backend callback on UI thread");
+                    handle->invoke_cc_assigned_from_backend(cc_number);
+                });
+            } else {
+                if (!is_cc_message) {
+                    GUI_LOG_DEBUG("Assignment", "Ignoring non-CC message during CC assignment: type=%d",
+                                  static_cast<int>(message.message_type));
+                } else {
+                    GUI_LOG_WARNING("Assignment", "Received out-of-range CC during assignment: %u", message.data1);
                 }
             }
         }
@@ -402,6 +427,45 @@ int main()
     });
 
     app->on_reset_note_clicked([](int channel_idx) {
+    });
+
+    app->on_assign_cc_clicked([&controller]() {
+        GUI_LOG_INFO("Assignment", "Entering CC assignment mode");
+        controller.is_assigning_cc.store(true);
+    });
+
+    app->on_cc_assigned_from_backend([app](int cc_number) {
+        GUI_LOG_INFO("Assignment", "cc_assigned_from_backend callback received: CC=%d", cc_number);
+
+        auto temp_config = app->get_temp_mode_config();
+        temp_config.cc_data.cc_number = cc_number;
+        app->set_temp_mode_config(temp_config);
+
+        app->set_temp_is_assigning_cc(false);
+        app->set_temp_popup_dirty(true);
+    });
+
+    app->on_reset_cc_clicked([app]() {
+        GUI_LOG_INFO("Assignment", "Resetting CC assignment");
+
+        auto temp_config = app->get_temp_mode_config();
+        temp_config.cc_data.cc_number = 0;
+        app->set_temp_mode_config(temp_config);
+
+        app->set_temp_popup_dirty(true);
+    });
+
+    app->on_popup_closed([&controller, app]() {
+        if (controller.is_assigning_note.load()) {
+            GUI_LOG_INFO("Assignment", "Popup closed during note assignment - canceling");
+            controller.is_assigning_note.store(false);
+            controller.channel_awaiting_note.store(-1);
+        }
+        if (controller.is_assigning_cc.load()) {
+            GUI_LOG_INFO("Assignment", "Popup closed during CC assignment - canceling");
+            controller.is_assigning_cc.store(false);
+            app->set_temp_is_assigning_cc(false);
+        }
     });
 
     app->set_midi_message("No midi message received yet");
