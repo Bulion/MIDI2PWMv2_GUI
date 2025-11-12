@@ -1,5 +1,6 @@
 import { CheckBox } from "std-widgets.slint";
 import { SliderWithPopup } from "../slider-with-popup.slint";
+import { AppStyle } from "../style.slint";
 
 export struct ADSRModeData {
     attack_level: int,
@@ -80,7 +81,7 @@ export component ADSRModeParams inherits VerticalLayout {
         }
     }
 
-    spacing: 6px;
+    spacing: AppStyle.spacing_sm;
 
     SliderWithPopup {
         label: "Attack Level";

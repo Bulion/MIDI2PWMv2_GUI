@@ -3,6 +3,7 @@ import { ConfirmDialog } from "confirm-dialog.slint";
 import { NoteConfigSection } from "note-config-section.slint";
 import { FaultStatusSection } from "fault-status-section.slint";
 import { ModeSelectionSection, ModeConfig } from "mode-selection-section.slint";
+import { AppStyle } from "style.slint";
 
 export { ModeConfig }
 
@@ -52,12 +53,12 @@ export component ChannelConfigPopup inherits Rectangle {
 
     private property <bool> show_confirm_dialog: false;
 
-    width: 640px;
-    height: 400px;
-    background: #232323;
-    border-radius: 12px;
-    border-width: 2px;
-    border-color: #aaa;
+    width: AppStyle.popup_config_width;
+    height: AppStyle.popup_config_height;
+    background: AppStyle.bg_dialog;
+    border-radius: AppStyle.radius_lg;
+    border-width: AppStyle.border_width_normal;
+    border-color: AppStyle.text_disabled;
 
     TouchArea {
         width: parent.width;
@@ -65,18 +66,18 @@ export component ChannelConfigPopup inherits Rectangle {
     }
 
     VerticalLayout {
-        padding-left: 12px;
-        padding-right: 12px;
-        padding-top: 12px;
+        padding-left: AppStyle.spacing_lg;
+        padding-right: AppStyle.spacing_lg;
+        padding-top: AppStyle.spacing_lg;
         alignment: LayoutAlignment.stretch;
-        padding-bottom: 12px;
-        spacing: 12px;
+        padding-bottom: AppStyle.spacing_lg;
+        spacing: AppStyle.spacing_lg;
 
         HorizontalLayout {
             Button {
                 text: "Save";
-                width: 70px;
-                height: 36px;
+                width: AppStyle.button_width_sm;
+                height: AppStyle.button_height;
                 enabled: root.is_dirty;
 
                 clicked => {
@@ -88,15 +89,15 @@ export component ChannelConfigPopup inherits Rectangle {
             Text {
                 text: "Configure Channel";
                 vertical-alignment: TextVerticalAlignment.center;
-                font-size: 18px;
+                font-size: AppStyle.font_size_subheading;
                 horizontal-alignment: TextHorizontalAlignment.center;
-                color: #ffffff;
+                color: AppStyle.text_primary;
             }
 
             Button {
                 text: "X";
-                width: 36px;
-                height: 36px;
+                width: AppStyle.input_height_sm;
+                height: AppStyle.input_height_sm;
 
                 clicked => {
                     if (root.is_dirty) {
@@ -111,7 +112,7 @@ export component ChannelConfigPopup inherits Rectangle {
 
         HorizontalLayout {
             alignment: LayoutAlignment.stretch;
-            spacing: 12px;
+            spacing: AppStyle.spacing_lg;
 
             VerticalLayout {
                 width: 50%;
@@ -145,7 +146,7 @@ export component ChannelConfigPopup inherits Rectangle {
 
             Rectangle {
                 width: 1px;
-                background: #444;
+                background: AppStyle.border_default;
             }
 
             ModeSelectionSection {
@@ -180,7 +181,7 @@ export component ChannelConfigPopup inherits Rectangle {
         y: 0px;
         width: parent.width;
         height: parent.height;
-        background: #000a;
+        background: AppStyle.overlay_backdrop;
 
         ConfirmDialog {
             x: (parent.width - self.width) / 2;

@@ -1,4 +1,5 @@
 import { Button } from "std-widgets.slint";
+import { AppStyle } from "style.slint";
 
 export component FaultStatusSection inherits VerticalLayout {
     in property <string> fault: "";
@@ -6,23 +7,23 @@ export component FaultStatusSection inherits VerticalLayout {
     callback reset_fault;
 
     alignment: LayoutAlignment.start;
-    spacing: 8px;
+    spacing: AppStyle.spacing_md;
 
     Rectangle {
-        height: 8px;
+        height: AppStyle.spacing_md;
     }
 
     Text {
         text: "Fault Status";
-        font-size: 14px;
-        color: #fff;
+        font-size: AppStyle.font_size_body;
+        color: AppStyle.text_primary;
         font-weight: 600;
     }
 
     Text {
         text: root.fault == "" ? "None" : root.fault;
-        color: root.fault == "" ? #0f0 : #f66;
-        font-size: 13px;
+        color: root.fault == "" ? AppStyle.status_success : AppStyle.status_error;
+        font-size: AppStyle.font_size_small_sm;
     }
 
     Button {
@@ -31,6 +32,6 @@ export component FaultStatusSection inherits VerticalLayout {
         clicked => {
             root.reset_fault();
         }
-        width: 100px;
+        width: AppStyle.button_width_md;
     }
 }

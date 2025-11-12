@@ -1,43 +1,44 @@
 import { LinearGauge } from "linear-gauge.slint";
+import { AppStyle } from "style.slint";
 
 component OutputsIndicator inherits HorizontalLayout {
-    height: 30px;
+    height: AppStyle.gauge_output_height;
     for i in 4: Rectangle {
-        background: (i == 0 || i == 3) ? #d87300 : #404041;
+        background: (i == 0 || i == 3) ? AppStyle.accent_orange_darker : AppStyle.bg_track;
     }
 }
 
 component DutyCycleGauge inherits LinearGauge {
-    height: 8px;
+    height: AppStyle.gauge_height;
     min_value: 0.0;
     max_value: 100.0;
-    track_color: #404041;
-    fill_color: #3399ff;
+    track_color: AppStyle.bg_track;
+    fill_color: AppStyle.accent_blue;
 }
 
 component DutyCycleText inherits Text {
-    color: #fff;
-    font-size: 14px;
+    color: AppStyle.text_primary;
+    font-size: AppStyle.font_size_body;
     horizontal-alignment: center;
 }
 
 component TelemetryRow inherits HorizontalLayout {
     in property <string> voltage;
     in property <string> current;
-    spacing: 5px;
+    spacing: AppStyle.spacing_xs;
 
     VerticalLayout {
         Text {
             text: voltage;
-            color: #fff;
-            font-size: 16px;
+            color: AppStyle.text_primary;
+            font-size: AppStyle.font_size_body_lg;
             horizontal-alignment: center;
         }
 
         Text {
             text: "V";
-            color: #fff;
-            font-size: 8px;
+            color: AppStyle.text_primary;
+            font-size: AppStyle.font_size_tiny;
             horizontal-alignment: center;
         }
     }
@@ -45,23 +46,23 @@ component TelemetryRow inherits HorizontalLayout {
     VerticalLayout {
         Text {
             text: current;
-            color: #fff;
-            font-size: 16px;
+            color: AppStyle.text_primary;
+            font-size: AppStyle.font_size_body_lg;
             horizontal-alignment: center;
         }
 
         Text {
             text: "mA";
-            color: #fff;
-            font-size: 8px;
+            color: AppStyle.text_primary;
+            font-size: AppStyle.font_size_tiny;
             horizontal-alignment: center;
         }
     }
 }
 
 component NoteText inherits Text {
-    color: #ccc;
-    font-size: 20px;
+    color: AppStyle.text_tertiary;
+    font-size: AppStyle.font_size_calculator;
     horizontal-alignment: center;
 }
 
@@ -78,8 +79,8 @@ export component ChannelCard {
     private property <string> current_formatted: Math.round(root.current);
     private property <string> duty_cycle_formatted: Math.round(root.duty_cycle * 10) / 10;
 
-    width: 100px;
-    height: 150px;
+    width: AppStyle.card_width;
+    height: AppStyle.card_height;
 
     TouchArea {
         width: parent.width;
@@ -106,10 +107,10 @@ export component ChannelCard {
         }
 
         VerticalLayout {
-            padding: 5px;
-            padding-top: !root.invert ? 5px : 35px;
-            padding-bottom: root.invert ? 5px : 35px;
-            spacing: 5px;
+            padding: AppStyle.spacing_xs;
+            padding-top: !root.invert ? AppStyle.spacing_xs : 35px;
+            padding-bottom: root.invert ? AppStyle.spacing_xs : 35px;
+            spacing: AppStyle.spacing_xs;
 
             if root.invert: DutyCycleGauge {
                 value: root.duty_cycle;

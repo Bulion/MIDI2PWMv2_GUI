@@ -1,4 +1,5 @@
 import { Slider } from "std-widgets.slint";
+import { AppStyle } from "style.slint";
 
 export component SliderWithPopup inherits Rectangle {
     in property <int> minimum: 0;
@@ -21,12 +22,12 @@ export component SliderWithPopup inherits Rectangle {
     }
 
     HorizontalLayout {
-        spacing: 8px;
+        spacing: AppStyle.spacing_md;
 
         Text {
             text: root.label + (root.suffix != "" ? " (" + root.suffix + "):" : "");
-            color: #ccc;
-            font-size: 12px;
+            color: AppStyle.text_tertiary;
+            font-size: AppStyle.font_size_small;
             vertical-alignment: center;
             width: 100px;
         }
@@ -42,15 +43,15 @@ export component SliderWithPopup inherits Rectangle {
         }
 
         Rectangle {
-            width: 45px;
-            background: #3a3a3a;
-            border-width: 1px;
-            border-color: #555;
+            width: AppStyle.input_width_value_display;
+            background: AppStyle.bg_input;
+            border-width: AppStyle.border_width_thin;
+            border-color: AppStyle.border_default;
 
             Text {
                 text: root.suffix == "%" ? (Math.round(root.value) / 10.0) : root.value;
-                color: #fff;
-                font-size: 12px;
+                color: AppStyle.text_primary;
+                font-size: AppStyle.font_size_small;
                 horizontal-alignment: center;
                 vertical-alignment: center;
             }

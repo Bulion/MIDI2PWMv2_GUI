@@ -1,4 +1,5 @@
 import { Button } from "std-widgets.slint";
+import { AppStyle } from "style.slint";
 
 export component NoteConfigSection inherits VerticalLayout {
     in-out property <string> note: "";
@@ -9,34 +10,34 @@ export component NoteConfigSection inherits VerticalLayout {
     callback note_changed;
 
     alignment: LayoutAlignment.start;
-    spacing: 12px;
+    spacing: AppStyle.spacing_lg;
 
     Text {
         text: "Note Configuration";
-        font-size: 14px;
-        color: #fff;
+        font-size: AppStyle.font_size_body;
+        color: AppStyle.text_primary;
         font-weight: 600;
         height: 24px;
     }
 
     Rectangle {
-        height: 36px;
-        background: root.is_assigning_note ? #445533 : transparent;
-        border-radius: 4px;
-        border-width: root.is_assigning_note ? 2px : 0px;
-        border-color: #88cc44;
+        height: AppStyle.input_height_sm;
+        background: root.is_assigning_note ? AppStyle.accent_green_dark : transparent;
+        border-radius: AppStyle.radius_sm;
+        border-width: root.is_assigning_note ? AppStyle.border_width_normal : 0px;
+        border-color: AppStyle.accent_green;
 
         Text {
             text: root.is_assigning_note ? "Waiting for MIDI..." : ("Note: " + root.note);
-            color: root.is_assigning_note ? #88cc44 : #eee;
-            font-size: 16px;
+            color: root.is_assigning_note ? AppStyle.accent_green : AppStyle.text_secondary;
+            font-size: AppStyle.font_size_body_lg;
             horizontal-alignment: center;
             vertical-alignment: center;
         }
     }
 
     HorizontalLayout {
-        spacing: 8px;
+        spacing: AppStyle.spacing_md;
 
         Button {
             text: "Assign";

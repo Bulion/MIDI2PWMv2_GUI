@@ -1,4 +1,5 @@
 import { Button } from "std-widgets.slint";
+import { AppStyle } from "style.slint";
 
 export component NumericInputPopup inherits Rectangle {
     in property <int> min_value: 0;
@@ -22,12 +23,12 @@ export component NumericInputPopup inherits Rectangle {
         first_digit_entry = true;
     }
 
-    width: 340px;
-    height: 420px;
-    background: #2a2a2a;
-    border-radius: 8px;
-    border-width: 2px;
-    border-color: #ff9933;
+    width: AppStyle.popup_numeric_width;
+    height: AppStyle.popup_numeric_height;
+    background: AppStyle.bg_popup;
+    border-radius: AppStyle.radius_md;
+    border-width: AppStyle.border_width_normal;
+    border-color: AppStyle.accent_orange;
 
     TouchArea {
         width: parent.width;
@@ -35,22 +36,22 @@ export component NumericInputPopup inherits Rectangle {
     }
 
     VerticalLayout {
-        padding: 16px;
-        spacing: 12px;
+        padding: AppStyle.spacing_xl;
+        spacing: AppStyle.spacing_lg;
 
         HorizontalLayout {
             Text {
                 text: root.label + (root.suffix != "" ? " (" + root.suffix + ")" : "");
-                font-size: 16px;
-                color: #fff;
+                font-size: AppStyle.font_size_body_lg;
+                color: AppStyle.text_primary;
                 font-weight: 600;
                 vertical-alignment: center;
             }
 
             Button {
                 text: "X";
-                width: 36px;
-                height: 36px;
+                width: AppStyle.input_height_sm;
+                height: AppStyle.input_height_sm;
                 clicked => {
                     root.canceled();
                 }
@@ -58,38 +59,38 @@ export component NumericInputPopup inherits Rectangle {
         }
 
         Rectangle {
-            height: 48px;
-            background: #1a1a1a;
-            border-width: 1px;
-            border-color: #555;
+            height: AppStyle.input_height_lg;
+            background: AppStyle.bg_primary;
+            border-width: AppStyle.border_width_thin;
+            border-color: AppStyle.border_default;
 
             Text {
                 text: root.input_text;
-                font-size: 24px;
-                color: root.is_valid ? #fff : #f66;
+                font-size: AppStyle.font_size_heading;
+                color: root.is_valid ? AppStyle.text_primary : AppStyle.status_error;
                 horizontal-alignment: center;
                 vertical-alignment: center;
             }
         }
 
         Rectangle {
-            background: #2a2a2a;
+            background: AppStyle.bg_popup;
 
             VerticalLayout {
-                spacing: 8px;
+                spacing: AppStyle.spacing_md;
 
                 GridLayout {
-                    spacing: 6px;
+                    spacing: AppStyle.spacing_sm;
                     Row {
                         Rectangle {
-                            background: #3a3a3a;
-                            border-width: 1px;
-                            border-color: #555;
+                            background: AppStyle.bg_input;
+                            border-width: AppStyle.border_width_thin;
+                            border-color: AppStyle.border_default;
 
                             Text {
                                 text: "7";
-                                font-size: 20px;
-                                color: #fff;
+                                font-size: AppStyle.font_size_calculator;
+                                color: AppStyle.text_primary;
                                 horizontal-alignment: center;
                                 vertical-alignment: center;
                             }
@@ -107,14 +108,14 @@ export component NumericInputPopup inherits Rectangle {
                         }
 
                         Rectangle {
-                            background: #3a3a3a;
-                            border-width: 1px;
-                            border-color: #555;
+                            background: AppStyle.bg_input;
+                            border-width: AppStyle.border_width_thin;
+                            border-color: AppStyle.border_default;
 
                             Text {
                                 text: "8";
-                                font-size: 20px;
-                                color: #fff;
+                                font-size: AppStyle.font_size_calculator;
+                                color: AppStyle.text_primary;
                                 horizontal-alignment: center;
                                 vertical-alignment: center;
                             }
@@ -132,14 +133,14 @@ export component NumericInputPopup inherits Rectangle {
                         }
 
                         Rectangle {
-                            background: #3a3a3a;
-                            border-width: 1px;
-                            border-color: #555;
+                            background: AppStyle.bg_input;
+                            border-width: AppStyle.border_width_thin;
+                            border-color: AppStyle.border_default;
 
                             Text {
                                 text: "9";
-                                font-size: 20px;
-                                color: #fff;
+                                font-size: AppStyle.font_size_calculator;
+                                color: AppStyle.text_primary;
                                 horizontal-alignment: center;
                                 vertical-alignment: center;
                             }
@@ -159,14 +160,14 @@ export component NumericInputPopup inherits Rectangle {
                         Rectangle {
                             col: 3;
                             colspan: 1;
-                            background: #4a4a4a;
-                            border-width: 1px;
-                            border-color: #666;
+                            background: AppStyle.bg_button;
+                            border-width: AppStyle.border_width_thin;
+                            border-color: AppStyle.border_default;
 
                             Text {
                                 text: "←";
-                                font-size: 20px;
-                                color: #fff;
+                                font-size: AppStyle.font_size_calculator;
+                                color: AppStyle.text_primary;
                                 horizontal-alignment: center;
                                 vertical-alignment: center;
                             }
@@ -181,14 +182,14 @@ export component NumericInputPopup inherits Rectangle {
 
                     Row {
                         Rectangle {
-                            background: #3a3a3a;
-                            border-width: 1px;
-                            border-color: #555;
+                            background: AppStyle.bg_input;
+                            border-width: AppStyle.border_width_thin;
+                            border-color: AppStyle.border_default;
 
                             Text {
                                 text: "4";
-                                font-size: 20px;
-                                color: #fff;
+                                font-size: AppStyle.font_size_calculator;
+                                color: AppStyle.text_primary;
                                 horizontal-alignment: center;
                                 vertical-alignment: center;
                             }
@@ -206,14 +207,14 @@ export component NumericInputPopup inherits Rectangle {
                         }
 
                         Rectangle {
-                            background: #3a3a3a;
-                            border-width: 1px;
-                            border-color: #555;
+                            background: AppStyle.bg_input;
+                            border-width: AppStyle.border_width_thin;
+                            border-color: AppStyle.border_default;
 
                             Text {
                                 text: "5";
-                                font-size: 20px;
-                                color: #fff;
+                                font-size: AppStyle.font_size_calculator;
+                                color: AppStyle.text_primary;
                                 horizontal-alignment: center;
                                 vertical-alignment: center;
                             }
@@ -231,14 +232,14 @@ export component NumericInputPopup inherits Rectangle {
                         }
 
                         Rectangle {
-                            background: #3a3a3a;
-                            border-width: 1px;
-                            border-color: #555;
+                            background: AppStyle.bg_input;
+                            border-width: AppStyle.border_width_thin;
+                            border-color: AppStyle.border_default;
 
                             Text {
                                 text: "6";
-                                font-size: 20px;
-                                color: #fff;
+                                font-size: AppStyle.font_size_calculator;
+                                color: AppStyle.text_primary;
                                 horizontal-alignment: center;
                                 vertical-alignment: center;
                             }
@@ -258,14 +259,14 @@ export component NumericInputPopup inherits Rectangle {
 
                     Row {
                         Rectangle {
-                            background: #3a3a3a;
-                            border-width: 1px;
-                            border-color: #555;
+                            background: AppStyle.bg_input;
+                            border-width: AppStyle.border_width_thin;
+                            border-color: AppStyle.border_default;
 
                             Text {
                                 text: "1";
-                                font-size: 20px;
-                                color: #fff;
+                                font-size: AppStyle.font_size_calculator;
+                                color: AppStyle.text_primary;
                                 horizontal-alignment: center;
                                 vertical-alignment: center;
                             }
@@ -283,14 +284,14 @@ export component NumericInputPopup inherits Rectangle {
                         }
 
                         Rectangle {
-                            background: #3a3a3a;
-                            border-width: 1px;
-                            border-color: #555;
+                            background: AppStyle.bg_input;
+                            border-width: AppStyle.border_width_thin;
+                            border-color: AppStyle.border_default;
 
                             Text {
                                 text: "2";
-                                font-size: 20px;
-                                color: #fff;
+                                font-size: AppStyle.font_size_calculator;
+                                color: AppStyle.text_primary;
                                 horizontal-alignment: center;
                                 vertical-alignment: center;
                             }
@@ -308,14 +309,14 @@ export component NumericInputPopup inherits Rectangle {
                         }
 
                         Rectangle {
-                            background: #3a3a3a;
-                            border-width: 1px;
-                            border-color: #555;
+                            background: AppStyle.bg_input;
+                            border-width: AppStyle.border_width_thin;
+                            border-color: AppStyle.border_default;
 
                             Text {
                                 text: "3";
-                                font-size: 20px;
-                                color: #fff;
+                                font-size: AppStyle.font_size_calculator;
+                                color: AppStyle.text_primary;
                                 horizontal-alignment: center;
                                 vertical-alignment: center;
                             }
@@ -335,14 +336,14 @@ export component NumericInputPopup inherits Rectangle {
 
                     Row {
                         Rectangle {
-                            background: #3a3a3a;
-                            border-width: 1px;
-                            border-color: #555;
+                            background: AppStyle.bg_input;
+                            border-width: AppStyle.border_width_thin;
+                            border-color: AppStyle.border_default;
 
                             Text {
                                 text: "0";
-                                font-size: 20px;
-                                color: #fff;
+                                font-size: AppStyle.font_size_calculator;
+                                color: AppStyle.text_primary;
                                 horizontal-alignment: center;
                                 vertical-alignment: center;
                             }
@@ -360,15 +361,15 @@ export component NumericInputPopup inherits Rectangle {
                         }
 
                         Rectangle {
-                            background: #3a3a3a;
-                            border-width: 1px;
-                            border-color: #555;
+                            background: AppStyle.bg_input;
+                            border-width: AppStyle.border_width_thin;
+                            border-color: AppStyle.border_default;
                             visible: root.is_float;
 
                             Text {
                                 text: ".";
-                                font-size: 20px;
-                                color: #fff;
+                                font-size: AppStyle.font_size_calculator;
+                                color: AppStyle.text_primary;
                                 horizontal-alignment: center;
                                 vertical-alignment: center;
                             }
@@ -388,9 +389,9 @@ export component NumericInputPopup inherits Rectangle {
 
                         Rectangle {
                             col: 2;
-                            background: #4a4a4a;
-                            border-width: 1px;
-                            border-color: #666;
+                            background: AppStyle.bg_button;
+                            border-width: AppStyle.border_width_thin;
+                            border-color: AppStyle.border_default;
 
                             Text {
                                 text: "C";
@@ -410,17 +411,17 @@ export component NumericInputPopup inherits Rectangle {
                 }
 
                 if root.quick_buttons.length > 0: HorizontalLayout {
-                    spacing: 6px;
+                    spacing: AppStyle.spacing_sm;
 
                     for button-text[index] in root.quick_buttons: Rectangle {
-                        background: #ff9933;
-                        border-width: 1px;
-                        border-color: #cc7722;
+                        background: AppStyle.accent_orange;
+                        border-width: AppStyle.border_width_thin;
+                        border-color: AppStyle.accent_orange_dark;
 
                         Text {
                             text: root.is_float ? (button-text.to-float() / 10.0) : button-text;
-                            font-size: 14px;
-                            color: #fff;
+                            font-size: AppStyle.font_size_body;
+                            color: AppStyle.text_primary;
                             font-weight: 600;
                             horizontal-alignment: center;
                             vertical-alignment: center;
@@ -436,15 +437,15 @@ export component NumericInputPopup inherits Rectangle {
                 }
 
                 Rectangle {
-                    height: 44px;
-                    background: root.is_valid ? #4a9944 : #555;
-                    border-width: 1px;
-                    border-color: root.is_valid ? #6cb963 : #666;
+                    height: AppStyle.input_height;
+                    background: root.is_valid ? AppStyle.accent_green_confirm : AppStyle.border_default;
+                    border-width: AppStyle.border_width_thin;
+                    border-color: root.is_valid ? AppStyle.accent_green_confirm_hover : AppStyle.border_default;
 
                     Text {
                         text: "Confirm";
-                        font-size: 16px;
-                        color: root.is_valid ? #fff : #888;
+                        font-size: AppStyle.font_size_body_lg;
+                        color: root.is_valid ? AppStyle.text_primary : AppStyle.text_disabled;
                         font-weight: 600;
                         horizontal-alignment: center;
                         vertical-alignment: center;

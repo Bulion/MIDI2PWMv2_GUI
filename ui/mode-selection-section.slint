@@ -6,6 +6,7 @@ import { ToggleModeParams, ToggleModeData } from "mode-params/toggle-mode-params
 import { ADSRModeParams, ADSRModeData } from "mode-params/adsr-mode-params.slint";
 import { CCControlModeParams, CCControlModeData } from "mode-params/cc-control-mode-params.slint";
 import { PitchBendModeParams, PitchBendModeData } from "mode-params/pitchbend-mode-params.slint";
+import { AppStyle } from "style.slint";
 
 export struct ModeConfig {
     mode_type: int,
@@ -41,12 +42,12 @@ export component ModeSelectionSection inherits VerticalLayout {
     callback reset_cc;
 
     alignment: LayoutAlignment.start;
-    spacing: 8px;
+    spacing: AppStyle.spacing_md;
 
     Text {
         text: "Output Mode";
-        font-size: 14px;
-        color: #fff;
+        font-size: AppStyle.font_size_body;
+        color: AppStyle.text_primary;
         font-weight: 600;
         height: 24px;
     }
@@ -77,14 +78,14 @@ export component ModeSelectionSection inherits VerticalLayout {
 
     Text {
         text: "Parameters";
-        font-size: 14px;
-        color: #fff;
+        font-size: AppStyle.font_size_body;
+        color: AppStyle.text_primary;
         font-weight: 600;
         height: 24px;
     }
 
     Rectangle {
-        background: #232323;
+        background: AppStyle.bg_dialog;
 
         VerticalLayout {
             spacing: 0px;

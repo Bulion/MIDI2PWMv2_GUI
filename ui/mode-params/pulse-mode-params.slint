@@ -1,5 +1,6 @@
 import { CheckBox } from "std-widgets.slint";
 import { SliderWithPopup } from "../slider-with-popup.slint";
+import { AppStyle } from "../style.slint";
 
 export struct PulseModeData {
     on_level: int,
@@ -69,7 +70,7 @@ export component PulseModeParams inherits VerticalLayout {
         }
     }
 
-    spacing: 6px;
+    spacing: AppStyle.spacing_sm;
 
     SliderWithPopup {
         label: "On Level";

@@ -10,6 +10,7 @@ import { ChannelConfigPopup, ModeConfig } from "channel-config-popup.slint";
 import { NumericInputPopup } from "numeric-input-popup.slint";
 import { ChannelData } from "channel-data.slint";
 import { DefaultModels } from "default-models-data.slint";
+import { AppStyle } from "style.slint";
 
 export { ChannelData }
 
@@ -23,19 +24,19 @@ component ConnectionScreen inherits Rectangle {
 
     width: 100%;
     height: 100%;
-    background: #1a1d21;
+    background: AppStyle.bg_primary;
 
     VerticalBox {
         width: 60%;
         height: 50%;
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
-        spacing: 16px;
+        spacing: AppStyle.spacing_xl;
 
         Text {
             text: "Select MIDI Connection";
-            font-size: 22px;
-            color: #ffffff;
+            font-size: AppStyle.font_size_heading_sm;
+            color: AppStyle.text_primary;
         }
 
         ComboBox {
@@ -45,7 +46,7 @@ component ConnectionScreen inherits Rectangle {
         }
 
         HorizontalBox {
-            spacing: 12px;
+            spacing: AppStyle.spacing_lg;
 
             Button {
                 text: "Refresh";
@@ -67,20 +68,20 @@ component ConnectionScreen inherits Rectangle {
 
         Text {
             text: root.status_text;
-            color: #ff6666;
+            color: AppStyle.status_error;
             visible: root.status_text != "";
         }
     }
 }
 
 export component AppWindow inherits Window {
-    preferred-width: 800px;
-    preferred-height: 480px;
-    min-width: 800px;
-    min-height: 480px;
-    max-width: 800px;
-    max-height: 480px;
-    background: #1a1d21;
+    preferred-width: AppStyle.window_preferred_width;
+    preferred-height: AppStyle.window_preferred_height;
+    min-width: AppStyle.window_preferred_width;
+    min-height: AppStyle.window_preferred_height;
+    max-width: AppStyle.window_preferred_width;
+    max-height: AppStyle.window_preferred_height;
+    background: AppStyle.bg_primary;
 
     in-out property <string> midi_message: "No midi message received yet";
     in-out property <bool> show_connection_screen: false;
@@ -106,8 +107,8 @@ export component AppWindow inherits Window {
         ramped_data: { on_level: 255, velocity_sensitive: true, attack_time_ms: 100, release_time_ms: 100 },
     };
 
-    in property <length> card_width: 100px;
-    in property <length> card_height: 150px;
+    in property <length> card_width: AppStyle.card_width;
+    in property <length> card_height: AppStyle.card_height;
 
     private property <bool> show_numeric_input: false;
     private property <int> numeric_input_min: 0;
@@ -151,22 +152,22 @@ export component AppWindow inherits Window {
         z: 200;
         width: parent.width;
         height: parent.height;
-        background: #1a1d21;
+        background: AppStyle.bg_primary;
 
         VerticalBox {
             alignment: center;
 
             Text {
                 text: "Connecting to device...";
-                font-size: 24px;
-                color: #ffffff;
+                font-size: AppStyle.font_size_heading;
+                color: AppStyle.text_primary;
                 horizontal-alignment: center;
             }
 
             Text {
                 text: "Waiting for telemetry data";
-                font-size: 16px;
-                color: #888888;
+                font-size: AppStyle.font_size_body_lg;
+                color: AppStyle.text_secondary;
                 horizontal-alignment: center;
             }
         }
@@ -185,8 +186,8 @@ export component AppWindow inherits Window {
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
             text: root.midi_message;
-            color: #ffffff;
-            font-size: 24px;
+            color: AppStyle.text_primary;
+            font-size: AppStyle.font_size_heading;
         }
 
         for i in 16: ChannelCard {
@@ -226,7 +227,7 @@ export component AppWindow inherits Window {
             y: 0px;
             width: parent.width;
             height: parent.height;
-            background: #000a;
+            background: AppStyle.overlay_backdrop;
 
             TouchArea {
                 x: 0px;
@@ -315,7 +316,7 @@ export component AppWindow inherits Window {
         y: 0px;
         width: parent.width;
         height: parent.height;
-        background: #000a;
+        background: AppStyle.overlay_backdrop;
 
         TouchArea {
             clicked => {
