@@ -93,6 +93,124 @@ GUI/
 - **Dependency Injection**: ViewModels receive backend references via constructor
 - **Platform Abstraction**: ConnectionBackend interface isolates platform-specific code
 
+### UI Component Architecture
+
+The UI is organized into a modular component hierarchy for maximum reusability and maintainability:
+
+#### Core Component Library (ui/components/)
+
+**ModalOverlay** (modal_overlay.slint):
+- Full-screen modal backdrop with dismiss callback
+- Handles z-layering (z: 400), positioning, and background
+- Reusable across all modal dialogs
+- Usage: Wrap any popup content with ModalOverlay
+
+**CalculatorButton** (calculator_button.slint):
+- Reusable button component for numeric input interface
+- Customizable: text, text_color, button_background, button_border
+- Consistent styling using AppStyle defaults
+- Eliminates ~110 lines of duplicate button code
+
+#### Composite Components
+
+**SliderWithPopup** (slider-with-popup.slint):
+- Combined slider + value display + popup trigger
+- Supports both integer and float values via max_decimals
+- Integrated with NumericInputPopup for precise value entry
+- Used across all mode parameter configurations
+
+**NumericInputPopup** (numeric-input-popup.slint):
+- Calculator-style numeric input interface
+- Validation with min/max bounds and decimal precision control
+- Quick preset buttons for common values
+- Uses CalculatorButton components (13 instances)
+
+#### Mode Parameter Components (ui/mode-params/)
+
+Modular components for each PWM channel mode with consistent structure:
+- instant-mode-params.slint
+- ramped-mode-params.slint
+- pulse-mode-params.slint
+- toggle-mode-params.slint
+- adsr-mode-params.slint
+- cc-control-mode-params.slint
+- pitchbend-mode-params.slint
+
+All follow same pattern: data struct export, parameter inputs via SliderWithPopup, callbacks for changes and numeric input requests.
+
+### Global Styling System
+
+**AppStyle** (ui/style.slint):
+- Centralized color palette and sizing constants
+- All colors, spacing, fonts, and dimensions defined in one place
+- Zero hardcoded styling values elsewhere in codebase
+- ESP32-optimized values (no gradients, minimal transparency)
+
+Key style categories:
+- Colors: bg_*, text_*, accent_*, border_*, status_*
+- Spacing: spacing_xs through spacing_xl
+- Dimensions: input_height_*, input_width_*, popup_*
+- Typography: font_size_* (small through heading)
+- Border/Radius: border_width_*, radius_*
+
+### Value Conversion Architecture
+
+**Principle**: All value conversions between device format (0-255 uint8) and display format (0.0-100.0 float percentage) happen exclusively in C++ layer.
+
+**C++ Layer** (common/include/gui_common/view_models/channel_telemetry_view_model.h):
+```cpp
+inline constexpr float deviceToUiPercent(std::uint8_t deviceValue) {
+    return (static_cast<float>(deviceValue) / 255.0F) * 100.0F;
+}
+
+inline constexpr std::uint8_t uiPercentToDevice(float uiPercent) {
+    return static_cast<std::uint8_t>((uiPercent / 100.0F) * 255.0F + 0.5F);
+}
+```
+
+**UI Layer**: Receives and displays float percentages (0.0-100.0) directly. Temporary integer scaling (×10) used for slider precision until native float sliders available.
+
+**Benefits**:
+- Single source of truth for conversion logic
+- Type-safe conversions with proper rounding
+- UI code simplified and more maintainable
+- Easy to change conversion strategy in one place
+
+### Feedback Loop Prevention Pattern
+
+Mode parameter components use ignore/target mechanism to prevent feedback loops when numeric popup updates values:
+
+```slint
+private property <bool> ignore_slider_changes: false;
+private property <int> target_value: -1;
+
+// When popup confirms value:
+ignore_slider_changes = true;
+target_value = confirmed_value;
+data.field = confirmed_value / scale;
+
+// In slider changed callback:
+if (ignore_slider_changes) {
+    if (Math.abs(new_value - target_value) < 5) {
+        ignore_slider_changes = false;
+        target_value = -1;
+    }
+} else {
+    data.field = new_value / scale;
+}
+```
+
+This pattern prevents circular updates: popup→data→slider→data→slider...
+
+### Decimal Precision Control
+
+The max_decimals property provides explicit control over numeric precision:
+- max_decimals: 0 → integer values only
+- max_decimals: 1 → one decimal place (percentages: 0.0-100.0)
+- max_decimals: 2+ → future extensibility
+
+Replaces boolean is_float flag with semantically clearer integer precision specification.
+
 ## Slint UI Framework Best Practices
 
 ### Slint Language Basics
