@@ -1,173 +1,82 @@
-import { Gauge } from "gauge.slint";
 import { LinearGauge } from "linear-gauge.slint";
 
-component Card inherits Rectangle {
-    in property <string> note: "E#";
-    in property <float> voltage: 20.0;
-    in property <float> current: 2300.0;
-
-    border-top-left-radius: 20px;
-    border-top-right-radius: 20px;
-    background: #25282d;
-    border-width: 1px;
-    border-color: #404041;
-
-    note_label := Text {
-        text: note;
-        color: #ccc;
-        font-size: 24px;
-        horizontal-alignment: center;
-        y: 5px;
-        width: parent.width;
+component OutputsIndicator inherits HorizontalLayout {
+    height: 30px;
+    for i in 4: Rectangle {
+        background: (i == 0 || i == 3) ? #d87300 : #404041;
     }
+}
 
-    HorizontalLayout {
-        width: parent.width;
-        y: note_label.y + note_label.height + 5px;
-        padding: 5px;
-        spacing: 10px;
+component DutyCycleGauge inherits LinearGauge {
+    height: 8px;
+    min_value: 0.0;
+    max_value: 100.0;
+    track_color: #404041;
+    fill_color: #3399ff;
+}
 
-        Gauge {
-            stroke_width: 4px;
-            width: 40px;
-            height: 40px;
-            min_value: 0.0;
-            max_value: 36.0;
-            value_precision: 1;
-            value: voltage;
-            unit: "V";
+component DutyCycleText inherits Text {
+    color: #fff;
+    font-size: 14px;
+    horizontal-alignment: center;
+}
+
+component TelemetryRow inherits HorizontalLayout {
+    in property <string> voltage;
+    in property <string> current;
+    spacing: 5px;
+
+    VerticalLayout {
+        Text {
+            text: voltage;
+            color: #fff;
+            font-size: 16px;
+            horizontal-alignment: center;
         }
 
-        Gauge {
-            stroke_width: 4px;
-            width: 40px;
-            height: 40px;
-            min_value: 0.0;
-            max_value: 4000.0;
-            value: current;
-            unit: "mA";
+        Text {
+            text: "V";
+            color: #fff;
+            font-size: 8px;
+            horizontal-alignment: center;
         }
     }
 
     VerticalLayout {
-        height: 50px;
-        y: parent.height - self.height;
-        spacing: 10px;
-
-        LinearGauge {
-            x: 5px;
-            width: parent.width - 2 * self.x;
-            height: 10px;
-            min_value: 0.0;
-            max_value: 100.0;
-            value: voltage / 36.0 * 100.0;
-            flip: false;
-            track_color: #ddd;
-            fill_color: #3399ff;
+        Text {
+            text: current;
+            color: #fff;
+            font-size: 16px;
+            horizontal-alignment: center;
         }
 
-        HorizontalLayout {
-            width: parent.width;
-            for i in 4: Rectangle {
-                width: parent.width / 4;
-                background: (i == 0 || i == 3) ? #d87300 : #404041;
-                border-top-left-radius: 10px;
-                border-top-right-radius: 10px;
-                border-width: 1px;
-                border-color: #b4b4b4;
-            }
+        Text {
+            text: "mA";
+            color: #fff;
+            font-size: 8px;
+            horizontal-alignment: center;
         }
     }
 }
 
-component InvertedCard inherits Rectangle {
-    in property <string> note: "E#";
-    in property <float> voltage: 20.0;
-    in property <float> current: 2300.0;
-
-    border-bottom-left-radius: 20px;
-    border-bottom-right-radius: 20px;
-    background: #25282d;
-    border-width: 1px;
-    border-color: #404041;
-
-    note_label := Text {
-        text: note;
-        color: #ccc;
-        font-size: 24px;
-        horizontal-alignment: center;
-        y: parent.height - self.height - 5px;
-        width: parent.width;
-    }
-
-    HorizontalLayout {
-        width: parent.width;
-        height: 40px;
-        y: note_label.y - self.height - 10px;
-        padding: 5px;
-        spacing: 10px;
-
-        Gauge {
-            stroke_width: 4px;
-            width: 40px;
-            height: parent.height;
-            min_value: 0.0;
-            max_value: 4000.0;
-            value: current;
-            unit: "mA";
-            rotation: 180deg;
-        }
-
-        Gauge {
-            stroke_width: 4px;
-            width: 40px;
-            height: parent.height;
-            min_value: 0.0;
-            max_value: 36.0;
-            value_precision: 1;
-            value: voltage;
-            unit: "V";
-            rotation: 180deg;
-        }
-    }
-
-    VerticalLayout {
-        height: 50px;
-        y: 0px;
-        spacing: 10px;
-
-        HorizontalLayout {
-            width: parent.width;
-            for i in 4: Rectangle {
-                width: parent.width / 4;
-                background: (i == 0 || i == 3) ? #d87300 : #404041;
-                border-bottom-left-radius: 10px;
-                border-bottom-right-radius: 10px;
-                border-width: 1px;
-                border-color: #b4b4b4;
-            }
-        }
-
-        LinearGauge {
-            x: 5px;
-            width: parent.width - 2 * self.x;
-            height: 10px;
-            min_value: 0.0;
-            max_value: 100.0;
-            value: voltage / 36.0 * 100.0;
-            flip: true;
-            track_color: #ddd;
-            fill_color: #3399ff;
-        }
-    }
+component NoteText inherits Text {
+    color: #ccc;
+    font-size: 20px;
+    horizontal-alignment: center;
 }
 
 export component ChannelCard {
     in property <string> note: "E#";
     in property <float> voltage: 20.0;
     in property <float> current: 2300.0;
+    in property <float> duty_cycle: 50.0;
+    in property <bool> is_active: false;
     in property <bool> invert: false;
     callback clicked;
+
+    private property <string> voltage_formatted: Math.round(root.voltage * 10) / 10;
+    private property <string> current_formatted: Math.round(root.current);
+    private property <string> duty_cycle_formatted: Math.round(root.duty_cycle * 10) / 10;
 
     width: 100px;
     height: 150px;
@@ -180,17 +89,53 @@ export component ChannelCard {
         }
     }
 
-    InvertedCard {
-        visible: root.invert;
-        note: root.note;
-        voltage: root.voltage;
-        current: root.current;
-    }
+    Rectangle {
+        width: parent.width;
+        height: parent.height;
 
-    Card {
-        visible: !root.invert;
-        note: root.note;
-        voltage: root.voltage;
-        current: root.current;
+        Rectangle {
+            OutputsIndicator {
+                y: root.invert ? 0px : root.height - self.height;
+            }
+
+            Image {
+                width: parent.width;
+                height: parent.height;
+                source: root.invert ? @image-url("assets/channel-card-inverted.png") : @image-url("assets/channel-card.png");
+            }
+        }
+
+        VerticalLayout {
+            padding: 5px;
+            padding-top: !root.invert ? 5px : 35px;
+            padding-bottom: root.invert ? 5px : 35px;
+            spacing: 5px;
+
+            if root.invert: DutyCycleGauge {
+                value: root.duty_cycle;
+            }
+            if root.invert: DutyCycleText {
+                text: root.duty_cycle_formatted + " %";
+            }
+            if root.invert: TelemetryRow {
+                voltage: root.voltage_formatted;
+                current: root.current_formatted;
+            }
+
+            NoteText {
+                text: root.note;
+            }
+
+            if !root.invert: TelemetryRow {
+                voltage: root.voltage_formatted;
+                current: root.current_formatted;
+            }
+            if !root.invert: DutyCycleText {
+                text: root.duty_cycle_formatted + " %";
+            }
+            if !root.invert: DutyCycleGauge {
+                value: root.duty_cycle;
+            }
+        }
     }
 }
