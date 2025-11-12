@@ -1,0 +1,74 @@
+import { Slider } from "std-widgets.slint";
+
+export component SliderWithPopup inherits Rectangle {
+    in property <int> minimum: 0;
+    in property <int> maximum: 100;
+    in-out property <int> value: 0;
+    in property <string> label: "";
+    in property <string> suffix: "";
+    in property <[string]> quick_buttons: [];
+    in property <string> field_name: "";
+    in property <bool> is_float: false;
+
+    callback changed(int);
+    callback request_numeric_input(int, int, int, string, string, [string], string, bool);
+    callback value_updated_externally(int);
+
+    background: transparent;
+
+    changed value => {
+        the-slider.value = root.value;
+    }
+
+    HorizontalLayout {
+        spacing: 8px;
+
+        Text {
+            text: root.label + (root.suffix != "" ? " (" + root.suffix + "):" : "");
+            color: #ccc;
+            font-size: 12px;
+            vertical-alignment: center;
+            width: 100px;
+        }
+
+        the-slider := Slider {
+            minimum: root.minimum;
+            maximum: root.maximum;
+            value: root.value;
+            changed(new_value) => {
+                root.value = Math.round(new_value);
+                root.changed(Math.round(new_value));
+            }
+        }
+
+        Rectangle {
+            width: 45px;
+            background: #3a3a3a;
+            border-width: 1px;
+            border-color: #555;
+
+            Text {
+                text: root.suffix == "%" ? (Math.round(root.value) / 10.0) : root.value;
+                color: #fff;
+                font-size: 12px;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+
+            TouchArea {
+                clicked => {
+                    root.request_numeric_input(
+                        root.minimum,
+                        root.maximum,
+                        root.value,
+                        root.label,
+                        root.suffix,
+                        root.quick_buttons,
+                        root.field_name,
+                        root.is_float
+                    );
+                }
+            }
+        }
+    }
+}

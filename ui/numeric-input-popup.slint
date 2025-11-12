@@ -1,0 +1,465 @@
+import { Button } from "std-widgets.slint";
+
+export component NumericInputPopup inherits Rectangle {
+    in property <int> min_value: 0;
+    in property <int> max_value: 255;
+    in property <int> current_value: 0;
+    in property <string> label: "Value";
+    in property <string> suffix: "";
+    in property <[string]> quick_buttons: [];
+    in property <bool> is_float: false;
+
+    callback confirmed(int);
+    callback canceled();
+
+    private property <string> input_text: "";
+    private property <bool> first_digit_entry: true;
+    private property <int> parsed_value: root.is_float ? Math.round(input_text.to-float() * 10.0) : input_text.to-float();
+    private property <bool> is_valid: parsed_value >= min_value && parsed_value <= max_value;
+
+    changed current_value => {
+        root.input_text = root.is_float ? (current_value / 10.0) : (current_value + "");
+        first_digit_entry = true;
+    }
+
+    width: 340px;
+    height: 420px;
+    background: #2a2a2a;
+    border-radius: 8px;
+    border-width: 2px;
+    border-color: #ff9933;
+
+    TouchArea {
+        width: parent.width;
+        height: parent.height;
+    }
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 12px;
+
+        HorizontalLayout {
+            Text {
+                text: root.label + (root.suffix != "" ? " (" + root.suffix + ")" : "");
+                font-size: 16px;
+                color: #fff;
+                font-weight: 600;
+                vertical-alignment: center;
+            }
+
+            Button {
+                text: "X";
+                width: 36px;
+                height: 36px;
+                clicked => {
+                    root.canceled();
+                }
+            }
+        }
+
+        Rectangle {
+            height: 48px;
+            background: #1a1a1a;
+            border-width: 1px;
+            border-color: #555;
+
+            Text {
+                text: root.input_text;
+                font-size: 24px;
+                color: root.is_valid ? #fff : #f66;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+
+        Rectangle {
+            background: #2a2a2a;
+
+            VerticalLayout {
+                spacing: 8px;
+
+                GridLayout {
+                    spacing: 6px;
+                    Row {
+                        Rectangle {
+                            background: #3a3a3a;
+                            border-width: 1px;
+                            border-color: #555;
+
+                            Text {
+                                text: "7";
+                                font-size: 20px;
+                                color: #fff;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+
+                            TouchArea {
+                                clicked => {
+                                    if (root.first_digit_entry) {
+                                    root.input_text = "7";
+                                    first_digit_entry = false;
+                                } else {
+                                    root.input_text += "7";
+                                }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            background: #3a3a3a;
+                            border-width: 1px;
+                            border-color: #555;
+
+                            Text {
+                                text: "8";
+                                font-size: 20px;
+                                color: #fff;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+
+                            TouchArea {
+                                clicked => {
+                                    if (root.first_digit_entry) {
+                                    root.input_text = "8";
+                                    first_digit_entry = false;
+                                } else {
+                                    root.input_text += "8";
+                                }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            background: #3a3a3a;
+                            border-width: 1px;
+                            border-color: #555;
+
+                            Text {
+                                text: "9";
+                                font-size: 20px;
+                                color: #fff;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+
+                            TouchArea {
+                                clicked => {
+                                    if (root.first_digit_entry) {
+                                    root.input_text = "9";
+                                    first_digit_entry = false;
+                                } else {
+                                    root.input_text += "9";
+                                }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            col: 3;
+                            colspan: 1;
+                            background: #4a4a4a;
+                            border-width: 1px;
+                            border-color: #666;
+
+                            Text {
+                                text: "←";
+                                font-size: 20px;
+                                color: #fff;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+
+                            TouchArea {
+                                clicked => {
+                                    root.input_text = "";
+                                }
+                            }
+                        }
+                    }
+
+                    Row {
+                        Rectangle {
+                            background: #3a3a3a;
+                            border-width: 1px;
+                            border-color: #555;
+
+                            Text {
+                                text: "4";
+                                font-size: 20px;
+                                color: #fff;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+
+                            TouchArea {
+                                clicked => {
+                                    if (root.first_digit_entry) {
+                                    root.input_text = "4";
+                                    first_digit_entry = false;
+                                } else {
+                                    root.input_text += "4";
+                                }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            background: #3a3a3a;
+                            border-width: 1px;
+                            border-color: #555;
+
+                            Text {
+                                text: "5";
+                                font-size: 20px;
+                                color: #fff;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+
+                            TouchArea {
+                                clicked => {
+                                    if (root.first_digit_entry) {
+                                    root.input_text = "5";
+                                    first_digit_entry = false;
+                                } else {
+                                    root.input_text += "5";
+                                }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            background: #3a3a3a;
+                            border-width: 1px;
+                            border-color: #555;
+
+                            Text {
+                                text: "6";
+                                font-size: 20px;
+                                color: #fff;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+
+                            TouchArea {
+                                clicked => {
+                                    if (root.first_digit_entry) {
+                                    root.input_text = "6";
+                                    first_digit_entry = false;
+                                } else {
+                                    root.input_text += "6";
+                                }
+                                }
+                            }
+                        }
+                    }
+
+                    Row {
+                        Rectangle {
+                            background: #3a3a3a;
+                            border-width: 1px;
+                            border-color: #555;
+
+                            Text {
+                                text: "1";
+                                font-size: 20px;
+                                color: #fff;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+
+                            TouchArea {
+                                clicked => {
+                                    if (root.first_digit_entry) {
+                                    root.input_text = "1";
+                                    first_digit_entry = false;
+                                } else {
+                                    root.input_text += "1";
+                                }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            background: #3a3a3a;
+                            border-width: 1px;
+                            border-color: #555;
+
+                            Text {
+                                text: "2";
+                                font-size: 20px;
+                                color: #fff;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+
+                            TouchArea {
+                                clicked => {
+                                    if (root.first_digit_entry) {
+                                    root.input_text = "2";
+                                    first_digit_entry = false;
+                                } else {
+                                    root.input_text += "2";
+                                }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            background: #3a3a3a;
+                            border-width: 1px;
+                            border-color: #555;
+
+                            Text {
+                                text: "3";
+                                font-size: 20px;
+                                color: #fff;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+
+                            TouchArea {
+                                clicked => {
+                                    if (root.first_digit_entry) {
+                                    root.input_text = "3";
+                                    first_digit_entry = false;
+                                } else {
+                                    root.input_text += "3";
+                                }
+                                }
+                            }
+                        }
+                    }
+
+                    Row {
+                        Rectangle {
+                            background: #3a3a3a;
+                            border-width: 1px;
+                            border-color: #555;
+
+                            Text {
+                                text: "0";
+                                font-size: 20px;
+                                color: #fff;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+
+                            TouchArea {
+                                clicked => {
+                                    if (root.first_digit_entry) {
+                                    root.input_text = "0";
+                                    first_digit_entry = false;
+                                } else {
+                                    root.input_text += "0";
+                                }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            background: #3a3a3a;
+                            border-width: 1px;
+                            border-color: #555;
+                            visible: root.is_float;
+
+                            Text {
+                                text: ".";
+                                font-size: 20px;
+                                color: #fff;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+
+                            TouchArea {
+                                enabled: root.is_float;
+                                clicked => {
+                                    if (root.first_digit_entry) {
+                                        root.input_text = "0.";
+                                        first_digit_entry = false;
+                                    } else {
+                                        root.input_text += ".";
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            col: 2;
+                            background: #4a4a4a;
+                            border-width: 1px;
+                            border-color: #666;
+
+                            Text {
+                                text: "C";
+                                font-size: 20px;
+                                color: #f66;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+
+                            TouchArea {
+                                clicked => {
+                                    root.input_text = "";
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if root.quick_buttons.length > 0: HorizontalLayout {
+                    spacing: 6px;
+
+                    for button-text[index] in root.quick_buttons: Rectangle {
+                        background: #ff9933;
+                        border-width: 1px;
+                        border-color: #cc7722;
+
+                        Text {
+                            text: root.is_float ? (button-text.to-float() / 10.0) : button-text;
+                            font-size: 14px;
+                            color: #fff;
+                            font-weight: 600;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        TouchArea {
+                            clicked => {
+                                root.input_text = root.is_float ? (button-text.to-float() / 10.0) : button-text;
+                                first_digit_entry = false;
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    height: 44px;
+                    background: root.is_valid ? #4a9944 : #555;
+                    border-width: 1px;
+                    border-color: root.is_valid ? #6cb963 : #666;
+
+                    Text {
+                        text: "Confirm";
+                        font-size: 16px;
+                        color: root.is_valid ? #fff : #888;
+                        font-weight: 600;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    TouchArea {
+                        enabled: root.is_valid;
+                        clicked => {
+                            if (root.is_valid) {
+                                root.confirmed(root.parsed_value);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
