@@ -7,6 +7,7 @@ import {
 } from "std-widgets.slint";
 import { ChannelCard } from "channel-card.slint";
 import { ChannelConfigPopup, ModeConfig } from "channel-config-popup.slint";
+import { NumericInputPopup } from "numeric-input-popup.slint";
 import { ChannelData } from "channel-data.slint";
 import { DefaultModels } from "default-models-data.slint";
 
@@ -96,9 +97,10 @@ export component AppWindow inherits Window {
     in-out property <string> temp_note: "";
     private property <string> temp_fault: "";
     in-out property <bool> temp_is_assigning: false;
+    in-out property <bool> temp_is_assigning_cc: false;
     in-out property <bool> temp_popup_dirty: false;
 
-    private property <ModeConfig> temp_mode_config: {
+    in-out property <ModeConfig> temp_mode_config: {
         mode_type: 0,
         instant_data: { on_level: 255, velocity_sensitive: true },
         ramped_data: { on_level: 255, velocity_sensitive: true, attack_time_ms: 100, release_time_ms: 100 },
@@ -107,12 +109,28 @@ export component AppWindow inherits Window {
     in property <length> card_width: 100px;
     in property <length> card_height: 150px;
 
+    private property <bool> show_numeric_input: false;
+    private property <int> numeric_input_min: 0;
+    private property <int> numeric_input_max: 255;
+    private property <int> numeric_input_value: 0;
+    private property <string> numeric_input_label: "";
+    private property <string> numeric_input_suffix: "";
+    private property <[string]> numeric_input_quick_buttons: [];
+    private property <bool> numeric_input_is_float: false;
+    private property <string> active_field: "";
+
+    private property <int> confirmed_value: -1;
+    private property <string> confirmed_field: "";
+
     callback refresh_ports();
     callback connect_port(string);
     callback save_channel_config(int, string, ModeConfig);
     callback assign_note_clicked(int);
     callback reset_note_clicked(int);
     callback note_assigned_from_backend(string);
+    callback assign_cc_clicked();
+    callback reset_cc_clicked();
+    callback cc_assigned_from_backend(int);
     callback popup_closed();
 
     ConnectionScreen {
@@ -235,6 +253,24 @@ export component AppWindow inherits Window {
 
                 mode_config <=> root.temp_mode_config;
 
+                confirmed_value: root.confirmed_value;
+                confirmed_field: root.confirmed_field;
+                is_assigning_cc <=> root.temp_is_assigning_cc;
+
+                request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
+                    root.confirmed_value = -1;
+                    root.confirmed_field = "";
+                    root.active_field = field;
+                    root.numeric_input_min = min;
+                    root.numeric_input_max = max;
+                    root.numeric_input_value = val;
+                    root.numeric_input_label = label;
+                    root.numeric_input_suffix = suffix;
+                    root.numeric_input_quick_buttons = buttons;
+                    root.numeric_input_is_float = is_float;
+                    root.show_numeric_input = true;
+                }
+
                 assign_note => {
                     root.assign_note_clicked(root.current_channel_index);
                 }
@@ -242,6 +278,14 @@ export component AppWindow inherits Window {
                 reset_note => {
                     root.temp_note = "";
                     root.reset_note_clicked(root.current_channel_index);
+                }
+
+                assign_cc => {
+                    root.assign_cc_clicked();
+                }
+
+                reset_cc => {
+                    root.reset_cc_clicked();
                 }
 
                 reset_fault => {
@@ -260,6 +304,45 @@ export component AppWindow inherits Window {
                     show_popup = false;
                     root.popup_closed();
                 }
+            }
+        }
+    }
+
+    Rectangle {
+        visible: root.show_numeric_input;
+        z: 400;
+        x: 0px;
+        y: 0px;
+        width: parent.width;
+        height: parent.height;
+        background: #000a;
+
+        TouchArea {
+            clicked => {
+                root.show_numeric_input = false;
+            }
+        }
+
+        NumericInputPopup {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            min_value: root.numeric_input_min;
+            max_value: root.numeric_input_max;
+            current_value: root.numeric_input_value;
+            label: root.numeric_input_label;
+            suffix: root.numeric_input_suffix;
+            quick_buttons: root.numeric_input_quick_buttons;
+            is_float: root.numeric_input_is_float;
+
+            confirmed(new_value) => {
+                root.confirmed_value = new_value;
+                root.confirmed_field = root.active_field;
+                root.show_numeric_input = false;
+                root.temp_popup_dirty = true;
+            }
+
+            canceled => {
+                root.show_numeric_input = false;
             }
         }
     }
