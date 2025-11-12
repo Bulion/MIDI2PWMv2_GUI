@@ -203,6 +203,209 @@ int main() {
 - **Use @children for containers**: Allows efficient dynamic content
 - **Lazy loading**: Consider lazy-loading for complex views not immediately visible
 
+## ESP32-S3 Hardware and Slint for MCUs Constraints
+
+**CRITICAL**: The ESP32-S3 has NO 2D graphics acceleration and Slint uses a pure CPU software renderer. These constraints apply to BOTH desktop and ESP32 builds to maintain a unified codebase. Always design UI with embedded constraints in mind.
+
+### ESP32-S3 Hardware Capabilities
+
+#### What Hardware Acceleration EXISTS:
+- **RGB LCD Interface**: Parallel RGB interface with DMA for framebuffer transfers
+- **Color Formats**: RGB565 (16-bit) and RGB888 (24-bit) support
+- **Dual-Core CPU**: Two Xtensa LX7 cores @ 240MHz
+- **DMA**: Direct Memory Access bypasses CPU for framebuffer transfers
+
+#### What Hardware Acceleration DOES NOT EXIST:
+- **NO 2D Graphics Accelerator**: No dedicated 2D graphics hardware
+- **NO GPU**: No graphics processing unit
+- **NO Hardware Vector Graphics**: No SVG or vector graphics acceleration
+- **NO Hardware Rotation/Scaling**: No pixel processing accelerator (PPA is ESP32-P4 only)
+- **NO Hardware Blending**: All alpha compositing done in software
+
+### Slint Software Renderer Performance
+
+Slint for MCUs uses a pure CPU software renderer with significant performance limitations:
+
+- **Full Screen Render** (368x448): ~210ms (~4-5 fps) - UNACCEPTABLE for smooth animation
+- **Partial Dirty Region**: ~74ms (~10-15 fps) - MARGINAL for simple animations
+- **Static UI**: Excellent (only renders on change) - TARGET USE CASE
+
+**Performance Bottlenecks**:
+- Per-line value recomputation (cannot reuse computed values across scanlines)
+- Expensive square root calculations for rounded rectangles
+- Expensive alpha blending operations
+- Anti-aliasing overhead
+- Overdrawing inefficiencies (rendering same pixels multiple times)
+
+### UI Elements: Performance Cost
+
+#### CRITICAL - NEVER USE (Very Expensive):
+1. **Complex Gradients**: Linear gradients with border-radius are extremely expensive
+2. **Circular Gradients**: NOT SUPPORTED in software renderer
+3. **Shadows**: Require multiple render passes with blending
+4. **Trigonometric Calculations**: `Math.sin()`, `Math.cos()` in property bindings per frame
+5. **For Loops Creating Many Elements**: Creates 10+ rectangles with computed positions
+6. **Scrolling**: CPU-intensive continuous updates (use full-page transitions)
+7. **Continuous Animations**: Every animated frame must be fully re-rendered
+8. **SVG Images**: Poor quality rendering on MCU, scaling artifacts
+
+#### HIGH COST - Use Sparingly:
+1. **Rounded Rectangles**: Square root calculations + anti-aliasing per pixel
+2. **Border Radius**: Adds significant overhead to every shape
+3. **Transparency/Opacity**: Alpha compositing is expensive
+4. **Complex Property Bindings**: Mathematical expressions with many dependencies
+5. **Deep Component Nesting**: Increases traversal and rendering overhead
+6. **Dynamic Layouts**: Resizing/repositioning calculations
+
+#### LOW COST - Use Freely:
+1. **Flat Solid Colors**: Fast fills, no computation
+2. **Simple Rectangles**: No rounded corners, no gradients
+3. **Text Rendering**: Pre-rendered glyphs embedded at compile time
+4. **Static Layouts**: Fixed positioning, no dynamic calculations
+5. **Touch Areas**: Lightweight interaction handling
+6. **Conditional Visibility**: Showing/hiding elements based on state
+
+### Mandatory UI Design Rules for ESP32-S3
+
+These rules apply to ALL UI development (desktop and ESP32) to maintain unified codebase:
+
+#### Visual Elements:
+1. **Use rectangles with NO border-radius** (square corners only)
+2. **Use solid colors ONLY** (no gradients)
+3. **NO shadows or blur effects**
+4. **NO SVG graphics** (use pre-rendered PNG instead)
+5. **NO transparency layers** (use solid colors or minimal opacity)
+6. **NO animations** (except simple visibility toggles)
+
+#### Layout and Structure:
+1. **Static layouts ONLY** (no dynamic resizing)
+2. **Minimize total element count** (target <200 visual elements on screen)
+3. **Shallow component hierarchy** (avoid deep nesting)
+4. **Full-page transitions** (not scrolling views)
+5. **Pre-calculate ALL math in C++** (not in property bindings)
+
+#### Data Display:
+1. **Numeric text displays preferred** over graphical gauges
+2. **Simple progress bars** (2 rectangles: track + fill)
+3. **Status indicators** (solid color rectangles or pre-rendered icons)
+4. **Format strings in C++** before passing to UI
+
+#### Touch Interaction:
+1. **Minimum 44x44px touch targets**
+2. **Use Flickable** (not ScrollView) for touch panning
+3. **Simple button states** (no complex hover effects)
+
+### Image and Font Handling
+
+#### Image Assets:
+- **Compile-Time Embedding**: All images embedded using `@image-url("path/to/image.png")`
+- **Pre-Rendering**: Slint compiler pre-renders images at build time
+- **Supported Formats**: PNG (preferred), JPEG (photos only)
+- **AVOID**: SVG (poor quality on MCU, use PNG instead)
+- **Storage**: Place in `ui/assets/` directory
+- **Use Cases**: Static backgrounds, icons, decorative elements only
+
+#### Font Management:
+- **Compile-Time Embedding**: Fonts embedded at build time
+- **Limited Glyphs**: Only embed required character ranges to save memory
+- **Pre-Rendered**: Glyphs rasterized at specified sizes during compilation
+- **Memory Cost**: Each font/size/weight combination consumes memory
+
+### Memory Constraints
+
+#### RAM Requirements:
+- **Slint Runtime**: ~300KB minimum
+- **Framebuffer (RGB565)**: width × height × 2 bytes (e.g., 368×448 = 330KB)
+- **Total**: ~600KB+ for typical UI
+- **Line-by-Line Mode**: Only width × 2 bytes (896 bytes for 448px wide) - use if RAM scarce
+
+#### Memory Optimization:
+1. **Double Buffering**: Use PSRAM for framebuffers (ESP32-S3 specific)
+2. **Bounce Buffer Mode**: Small internal buffers reduce PSRAM contention
+3. **Minimize Font Embedding**: Only required glyphs/sizes/weights
+4. **Static Content in Flash**: Declare resources as `const`
+5. **Minimize Property Bindings**: Each binding adds memory overhead
+
+### Frame Rate Expectations
+
+Design for these realistic performance targets:
+
+- **Static Dashboard**: 30-60 fps (only updates on data change) - ✓ TARGET
+- **Simple Transitions**: 10-20 fps (acceptable for page changes)
+- **Continuous Animation**: 4-10 fps (avoid if possible)
+- **Complex Effects**: <5 fps (NEVER USE)
+
+### Target Use Cases for ESP32-S3 + Slint
+
+**Works Well:**
+- Control panels
+- Status dashboards
+- Configuration screens
+- Data monitoring displays
+- Simple HMI interfaces
+
+**Does NOT Work Well:**
+- Video playback
+- Games
+- Smooth animations
+- Scrolling lists
+- Complex visualizations
+
+### Display Configuration Recommendations
+
+#### Color Depth:
+- **Use RGB565** (16-bit, 65,536 colors) - best balance of quality and performance
+- Design color palette for 16-bit display (avoid subtle gradients)
+
+#### Resolution:
+- **Keep below 400×400px** for acceptable full-screen render times
+- Larger displays possible but expect longer render times
+
+#### Frame Buffer:
+- **PSRAM Double Buffer**: Best quality (no tearing)
+- **Bounce Buffer Mode**: Better performance with PSRAM
+- **Line-by-Line**: Minimal memory but highest CPU usage
+
+### Testing and Profiling
+
+#### Desktop Testing:
+1. Build and verify UI on desktop first
+2. Ensure performance is acceptable even with software renderer
+3. Test with Slint's `--rendering-backend software` flag to simulate MCU
+
+#### ESP32 Profiling:
+1. Monitor frame render times with ESP-IDF logging
+2. Track heap usage with `heap_caps_get_info()`
+3. Use FreeRTOS task monitoring for CPU usage
+4. Measure actual frame rates on target hardware
+
+#### Performance Metrics to Track:
+- Frame render time (target <33ms for 30fps)
+- Dirty region size (smaller = faster)
+- Heap fragmentation
+- CPU usage per task
+
+### Migration Path to ESP32-P4 (Future)
+
+If targeting ESP32-P4 in future for better performance:
+- ESP32-P4 has PPA (Pixel Processing Accelerator) for hardware rotation, scaling, blending
+- Hardware JPEG codec
+- Still NO vector graphics acceleration
+- Current conservative UI design will work perfectly and have headroom for enhancements
+
+### Summary: Golden Rules
+
+1. **Square rectangles with solid colors ONLY**
+2. **NO rounded corners, gradients, or shadows**
+3. **Numeric displays preferred over graphical gauges**
+4. **Pre-calculate math in C++, not in UI bindings**
+5. **Use pre-rendered PNG images for decorative elements**
+6. **Static layouts with fixed positioning**
+7. **Full-page transitions, NOT scrolling**
+8. **Design for 10-30 fps, not 60 fps**
+9. **Test on actual ESP32-S3 hardware early and often**
+10. **When in doubt, simpler is ALWAYS better**
+
 ## Platform-Specific Guidelines
 
 ### Desktop Build
