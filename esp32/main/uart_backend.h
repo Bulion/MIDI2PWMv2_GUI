@@ -17,8 +17,10 @@ using gui::common::PortInfo;
 class UartBackend : public gui::common::ConnectionBackend
 {
 public:
-    UartBackend();
+    UartBackend() = default;
     ~UartBackend() override;
+
+    bool initialize();
 
     std::vector<PortInfo> refreshPorts() override;
     bool connect(const std::string &portIdentifier) override;

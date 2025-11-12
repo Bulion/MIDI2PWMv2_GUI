@@ -92,6 +92,12 @@ extern "C" void app_main(void)
     MidiMessageViewModel message_view_model;
     ChannelTelemetryViewModel channel_telemetry_view_model;
     gui::esp32::UartBackend backend;
+
+    if (!backend.initialize()) {
+        GUI_LOG_ERROR(TAG, "Failed to initialize UART backend");
+        abort();
+    }
+
     ConnectionViewModel connection_view_model{backend, message_view_model, channel_telemetry_view_model};
 
     Esp32Controller controller{app, connection_view_model};

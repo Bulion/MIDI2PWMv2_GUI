@@ -23,7 +23,7 @@ constexpr uart_port_t kConsoleUart = UART_NUM_0;
 
 } // namespace
 
-UartBackend::UartBackend()
+bool UartBackend::initialize()
 {
     uart_config_t uartConfiguration{};
     uartConfiguration.baud_rate = 921600;
@@ -40,36 +40,41 @@ UartBackend::UartBackend()
 
     constexpr int NO_TRANSMIT_BUFFER = 0;
     constexpr int NO_EVENT_QUEUE = 0;
-    bool driverInstallationSucceeded =
-        (uart_driver_install(kUartPort, kBufferSize, NO_TRANSMIT_BUFFER, NO_EVENT_QUEUE, nullptr, 0) == ESP_OK);
-    if (!driverInstallationSucceeded) {
-        GUI_LOG_ERROR("UartBackend", "Failed to install UART driver");
-        return;
+    esp_err_t driverInstallResult =
+        uart_driver_install(kUartPort, kBufferSize, NO_TRANSMIT_BUFFER, NO_EVENT_QUEUE, nullptr, 0);
+    if (driverInstallResult != ESP_OK) {
+        GUI_LOG_ERROR("UartBackend", "Failed to install UART driver: %d", driverInstallResult);
+        return false;
     }
 
-    bool parameterConfigurationSucceeded = (uart_param_config(kUartPort, &uartConfiguration) == ESP_OK);
-    if (!parameterConfigurationSucceeded) {
-        GUI_LOG_ERROR("UartBackend", "Failed to configure UART parameters");
+    esp_err_t paramConfigResult = uart_param_config(kUartPort, &uartConfiguration);
+    if (paramConfigResult != ESP_OK) {
+        GUI_LOG_ERROR("UartBackend", "Failed to configure UART parameters: %d", paramConfigResult);
         uart_driver_delete(kUartPort);
-        return;
+        return false;
     }
 
-    bool pinConfigurationSucceeded =
-        (uart_set_pin(kUartPort, kTxPin, kRxPin, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE) == ESP_OK);
-    if (!pinConfigurationSucceeded) {
-        GUI_LOG_ERROR("UartBackend", "Failed to configure UART pins");
+    esp_err_t pinConfigResult = uart_set_pin(kUartPort, kTxPin, kRxPin, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    if (pinConfigResult != ESP_OK) {
+        GUI_LOG_ERROR("UartBackend", "Failed to configure UART pins: %d", pinConfigResult);
         uart_driver_delete(kUartPort);
-        return;
+        return false;
     }
 
-    readerTaskIsRunning_ = true;
     disconnectCallbackPending_ = true;
 
-    startFreeRtosReaderTask();
+    if (!startFreeRtosReaderTask()) {
+        uart_driver_delete(kUartPort);
+        return false;
+    }
+
+    return true;
 }
 
 UartBackend::~UartBackend()
 {
+    readerTaskIsRunning_ = false;
+    stopFreeRtosReaderTask();
 }
 
 std::vector<PortInfo> UartBackend::refreshPorts()
@@ -79,7 +84,7 @@ std::vector<PortInfo> UartBackend::refreshPorts()
 
 bool UartBackend::connect([[maybe_unused]] const std::string &portIdentifier)
 {
-    return true;
+    return readerTaskIsRunning_.load() && (readerTaskHandle_ != nullptr);
 }
 
 void UartBackend::disconnect()
@@ -105,19 +110,28 @@ void UartBackend::setDisconnectCallback(DisconnectCallback connectionLostCallbac
 
 bool UartBackend::write(const std::uint8_t *data, std::size_t size)
 {
-    bool notConnected = !readerTaskIsRunning_.load();
-    if (notConnected) {
+    if (!readerTaskIsRunning_.load()) {
         return false;
     }
 
     int bytesWrittenOrError = uart_write_bytes(kUartPort, data, size);
-    return (bytesWrittenOrError >= 0);
+
+    if (bytesWrittenOrError < 0) {
+        GUI_LOG_ERROR("UartBackend", "UART write error: %d", bytesWrittenOrError);
+        return false;
+    }
+
+    if (static_cast<std::size_t>(bytesWrittenOrError) != size) {
+        GUI_LOG_WARNING("UartBackend", "Partial UART write: %d/%zu bytes", bytesWrittenOrError, size);
+        return false;
+    }
+
+    return true;
 }
 
 bool UartBackend::startFreeRtosReaderTask()
 {
-    bool taskIsAlreadyRunning = (readerTaskHandle_ != nullptr);
-    if (taskIsAlreadyRunning) {
+    if (readerTaskHandle_ != nullptr) {
         return true;
     }
 
@@ -131,25 +145,36 @@ bool UartBackend::startFreeRtosReaderTask()
         &readerTaskHandle_,
         kTaskCore);
 
-    bool taskCreationSucceeded = (taskCreationResult == pdPASS);
-    if (!taskCreationSucceeded) {
+    if (taskCreationResult != pdPASS) {
         GUI_LOG_ERROR("UartBackend", "Failed to create UART reader task");
         readerTaskHandle_ = nullptr;
-        uart_driver_delete(kUartPort);
-        readerTaskIsRunning_ = false;
         return false;
     }
 
+    readerTaskIsRunning_ = true;
     return true;
 }
 
 void UartBackend::stopFreeRtosReaderTask()
 {
-    bool taskIsRunning = (readerTaskHandle_ != nullptr);
-    if (taskIsRunning) {
-        TaskHandle_t taskHandleToDelete = readerTaskHandle_;
+    if (readerTaskHandle_ == nullptr) {
+        return;
+    }
+
+    constexpr int MAX_WAIT_MS = 1000;
+    constexpr int POLL_INTERVAL_MS = 10;
+    int waitedMs = 0;
+
+    while (readerTaskHandle_ != nullptr && waitedMs < MAX_WAIT_MS) {
+        vTaskDelay(pdMS_TO_TICKS(POLL_INTERVAL_MS));
+        waitedMs += POLL_INTERVAL_MS;
+    }
+
+    if (readerTaskHandle_ != nullptr) {
+        GUI_LOG_WARNING("UartBackend", "Reader task did not exit gracefully, forcing deletion");
+        vTaskDelete(readerTaskHandle_);
         readerTaskHandle_ = nullptr;
-        vTaskDelete(taskHandleToDelete);
+        uart_driver_delete(kUartPort);
     }
 }
 
@@ -174,16 +199,19 @@ void UartBackend::uartReaderTaskLoop()
         TickType_t readTimeoutTicks = pdMS_TO_TICKS(kReadTimeoutMs);
         int bytesReadOrError = uart_read_bytes(kUartPort, receiveBuffer.data(), receiveBuffer.size(), readTimeoutTicks);
 
-        bool dataWasSuccessfullyRead = (bytesReadOrError > 0);
-        if (dataWasSuccessfullyRead) {
+        if (bytesReadOrError < 0) {
+            GUI_LOG_ERROR("UartBackend", "UART read error: %d", bytesReadOrError);
+            continue;
+        }
+
+        if (bytesReadOrError > 0) {
             gui::common::ConnectionBackend::DataCallback localCallbackCopy;
             {
                 std::lock_guard<std::mutex> callbackLock(callbackAccessMutex_);
                 localCallbackCopy = dataReceivedCallback_;
             }
 
-            bool callbackIsRegistered = (localCallbackCopy != nullptr);
-            if (callbackIsRegistered) {
+            if (localCallbackCopy != nullptr) {
                 size_t bytesReadCount = static_cast<std::size_t>(bytesReadOrError);
                 localCallbackCopy(receiveBuffer.data(), bytesReadCount);
             }
@@ -192,12 +220,13 @@ void UartBackend::uartReaderTaskLoop()
 
     uart_driver_delete(kUartPort);
 
+    readerTaskHandle_ = nullptr;
+
     bool callbackWasPending = disconnectCallbackPending_.exchange(false);
     if (callbackWasPending) {
         std::lock_guard<std::mutex> callbackLock(callbackAccessMutex_);
 
-        bool disconnectCallbackIsRegistered = (connectionLostCallback_ != nullptr);
-        if (disconnectCallbackIsRegistered) {
+        if (connectionLostCallback_ != nullptr) {
             connectionLostCallback_();
         }
     }
