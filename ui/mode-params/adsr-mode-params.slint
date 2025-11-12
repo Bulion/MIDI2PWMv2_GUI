@@ -3,8 +3,8 @@ import { SliderWithPopup } from "../slider-with-popup.slint";
 import { AppStyle } from "../style.slint";
 
 export struct ADSRModeData {
-    attack_level: int,
-    sustain_level: int,
+    attack_level: float,
+    sustain_level: float,
     velocity_sensitive: bool,
     attack_time_ms: int,
     decay_time_ms: int,
@@ -13,8 +13,8 @@ export struct ADSRModeData {
 
 export component ADSRModeParams inherits VerticalLayout {
     in-out property <ADSRModeData> data: {
-        attack_level: 255,
-        sustain_level: 200,
+        attack_level: 100.0,
+        sustain_level: 78.4,
         velocity_sensitive: true,
         attack_time_ms: 50,
         decay_time_ms: 100,
@@ -24,8 +24,8 @@ export component ADSRModeParams inherits VerticalLayout {
     in property <int> confirmed_value: -1;
     in property <string> confirmed_field: "";
 
-    in-out property <int> attack_level_value: Math.round((root.data.attack_level / 255.0) * 1000.0);
-    in-out property <int> sustain_level_value: Math.round((root.data.sustain_level / 255.0) * 1000.0);
+    in-out property <int> attack_level_value: Math.round(root.data.attack_level * 10.0);
+    in-out property <int> sustain_level_value: Math.round(root.data.sustain_level * 10.0);
     in-out property <int> attack_time_value: root.data.attack_time_ms;
     in-out property <int> decay_time_value: root.data.decay_time_ms;
     in-out property <int> release_time_value: root.data.release_time_ms;
@@ -50,13 +50,13 @@ export component ADSRModeParams inherits VerticalLayout {
             if (root.confirmed_field == "adsr_attack_level") {
                 ignore_attack_level_changes = true;
                 attack_level_target = root.confirmed_value;
-                root.data.attack_level = Math.round((root.confirmed_value / 1000.0) * 255.0);
+                root.data.attack_level = root.confirmed_value / 10.0;
                 attack_level_value = root.confirmed_value;
                 root.changed();
             } else if (root.confirmed_field == "adsr_sustain_level") {
                 ignore_sustain_level_changes = true;
                 sustain_level_target = root.confirmed_value;
-                root.data.sustain_level = Math.round((root.confirmed_value / 1000.0) * 255.0);
+                root.data.sustain_level = root.confirmed_value / 10.0;
                 sustain_level_value = root.confirmed_value;
                 root.changed();
             } else if (root.confirmed_field == "adsr_attack") {
@@ -103,7 +103,7 @@ export component ADSRModeParams inherits VerticalLayout {
                     attack_level_target = -1;
                 }
             } else {
-                root.data.attack_level = Math.round((new_value / 1000.0) * 255.0);
+                root.data.attack_level = new_value / 10.0;
                 root.changed();
             }
         }
@@ -129,7 +129,7 @@ export component ADSRModeParams inherits VerticalLayout {
                     sustain_level_target = -1;
                 }
             } else {
-                root.data.sustain_level = Math.round((new_value / 1000.0) * 255.0);
+                root.data.sustain_level = new_value / 10.0;
                 root.changed();
             }
         }

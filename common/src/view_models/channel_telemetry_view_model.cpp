@@ -44,13 +44,13 @@ void ChannelTelemetryViewModel::updateFromTelemetry(const midi2pwm::pwm::Channel
         if (modeParamsType == midi2pwm::pwm::ModeParametersUnion::InstantModeParams) {
             const auto* instantParams = telemetry.mode_params_as_InstantModeParams();
             if (instantParams != nullptr) {
-                channelData.instant_data.on_level = instantParams->on_level();
+                channelData.instant_data.on_level = deviceToUiPercent(instantParams->on_level());
                 channelData.instant_data.velocity_sensitive = instantParams->velocity_sensitive();
             }
         } else if (modeParamsType == midi2pwm::pwm::ModeParametersUnion::RampedModeParams) {
             const auto* rampedParams = telemetry.mode_params_as_RampedModeParams();
             if (rampedParams != nullptr) {
-                channelData.ramped_data.on_level = rampedParams->on_level();
+                channelData.ramped_data.on_level = deviceToUiPercent(rampedParams->on_level());
                 channelData.ramped_data.velocity_sensitive = rampedParams->velocity_sensitive();
                 channelData.ramped_data.attack_time_ms = rampedParams->attack_time_ms();
                 channelData.ramped_data.release_time_ms = rampedParams->release_time_ms();
@@ -58,7 +58,7 @@ void ChannelTelemetryViewModel::updateFromTelemetry(const midi2pwm::pwm::Channel
         } else if (modeParamsType == midi2pwm::pwm::ModeParametersUnion::PulseModeParams) {
             const auto* pulseParams = telemetry.mode_params_as_PulseModeParams();
             if (pulseParams != nullptr) {
-                channelData.pulse_data.on_level = pulseParams->on_level();
+                channelData.pulse_data.on_level = deviceToUiPercent(pulseParams->on_level());
                 channelData.pulse_data.velocity_sensitive = pulseParams->velocity_sensitive();
                 channelData.pulse_data.attack_time_ms = pulseParams->attack_time_ms();
                 channelData.pulse_data.hold_time_ms = pulseParams->hold_time_ms();
@@ -67,15 +67,15 @@ void ChannelTelemetryViewModel::updateFromTelemetry(const midi2pwm::pwm::Channel
         } else if (modeParamsType == midi2pwm::pwm::ModeParametersUnion::ToggleModeParams) {
             const auto* toggleParams = telemetry.mode_params_as_ToggleModeParams();
             if (toggleParams != nullptr) {
-                channelData.toggle_data.on_level = toggleParams->on_level();
+                channelData.toggle_data.on_level = deviceToUiPercent(toggleParams->on_level());
                 channelData.toggle_data.velocity_sensitive = toggleParams->velocity_sensitive();
                 channelData.toggle_data.debounce_delay_ms = toggleParams->debounce_delay_ms();
             }
         } else if (modeParamsType == midi2pwm::pwm::ModeParametersUnion::ADSRModeParams) {
             const auto* adsrParams = telemetry.mode_params_as_ADSRModeParams();
             if (adsrParams != nullptr) {
-                channelData.adsr_data.attack_level = adsrParams->attack_level();
-                channelData.adsr_data.sustain_level = adsrParams->sustain_level();
+                channelData.adsr_data.attack_level = deviceToUiPercent(adsrParams->attack_level());
+                channelData.adsr_data.sustain_level = deviceToUiPercent(adsrParams->sustain_level());
                 channelData.adsr_data.velocity_sensitive = adsrParams->velocity_sensitive();
                 channelData.adsr_data.attack_time_ms = adsrParams->attack_time_ms();
                 channelData.adsr_data.decay_time_ms = adsrParams->decay_time_ms();
@@ -86,15 +86,15 @@ void ChannelTelemetryViewModel::updateFromTelemetry(const midi2pwm::pwm::Channel
             if (ccParams != nullptr) {
                 channelData.cc_data.cc_number = ccParams->cc_number();
                 channelData.cc_data.center_value = ccParams->center_value();
-                channelData.cc_data.left_max_pwm = ccParams->left_max_pwm();
-                channelData.cc_data.right_max_pwm = ccParams->right_max_pwm();
+                channelData.cc_data.left_max_pwm = deviceToUiPercent(ccParams->left_max_pwm());
+                channelData.cc_data.right_max_pwm = deviceToUiPercent(ccParams->right_max_pwm());
                 channelData.cc_data.deadband_range = ccParams->deadband_range();
             }
         } else if (modeParamsType == midi2pwm::pwm::ModeParametersUnion::PitchBendModeParams) {
             const auto* pitchbendParams = telemetry.mode_params_as_PitchBendModeParams();
             if (pitchbendParams != nullptr) {
-                channelData.pitchbend_data.base_level = pitchbendParams->base_level();
-                channelData.pitchbend_data.bend_range = pitchbendParams->bend_range();
+                channelData.pitchbend_data.base_level = deviceToUiPercent(pitchbendParams->base_level());
+                channelData.pitchbend_data.bend_range = deviceToUiPercent(pitchbendParams->bend_range());
                 channelData.pitchbend_data.unipolar = pitchbendParams->unipolar();
                 channelData.pitchbend_data.velocity_sensitive = pitchbendParams->velocity_sensitive();
             }
@@ -127,13 +127,13 @@ void ChannelTelemetryViewModel::clear()
             channelData.current = 0.0F;
             channelData.fault = "";
             channelData.mode_type = 0;
-            channelData.instant_data = {255, true};
-            channelData.ramped_data = {255, true, 100, 100};
-            channelData.pulse_data = {255, true, 10, 100, 50};
-            channelData.toggle_data = {255, false, 50};
-            channelData.adsr_data = {255, 200, true, 50, 100, 200};
-            channelData.cc_data = {1, 64, 255, 255, 2};
-            channelData.pitchbend_data = {128, 64, false, true};
+            channelData.instant_data = {100.0F, true};
+            channelData.ramped_data = {100.0F, true, 100, 100};
+            channelData.pulse_data = {100.0F, true, 10, 100, 50};
+            channelData.toggle_data = {100.0F, false, 50};
+            channelData.adsr_data = {100.0F, deviceToUiPercent(200), true, 50, 100, 200};
+            channelData.cc_data = {1, 64, 100.0F, 100.0F, 2};
+            channelData.pitchbend_data = {deviceToUiPercent(128), deviceToUiPercent(64), false, true};
         }
 
         callback = updateCallback_;

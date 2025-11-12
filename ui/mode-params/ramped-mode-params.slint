@@ -3,7 +3,7 @@ import { SliderWithPopup } from "../slider-with-popup.slint";
 import { AppStyle } from "../style.slint";
 
 export struct RampedModeData {
-    on_level: int,
+    on_level: float,
     velocity_sensitive: bool,
     attack_time_ms: int,
     release_time_ms: int,
@@ -11,7 +11,7 @@ export struct RampedModeData {
 
 export component RampedModeParams inherits VerticalLayout {
     in-out property <RampedModeData> data: {
-        on_level: 255,
+        on_level: 100.0,
         velocity_sensitive: true,
         attack_time_ms: 100,
         release_time_ms: 100,
@@ -20,7 +20,7 @@ export component RampedModeParams inherits VerticalLayout {
     in property <int> confirmed_value: -1;
     in property <string> confirmed_field: "";
 
-    in-out property <int> on_level_value: Math.round((root.data.on_level / 255.0) * 1000.0);
+    in-out property <int> on_level_value: Math.round(root.data.on_level * 10.0);
     in-out property <int> attack_time_value: root.data.attack_time_ms;
     in-out property <int> release_time_value: root.data.release_time_ms;
 
@@ -40,7 +40,7 @@ export component RampedModeParams inherits VerticalLayout {
             if (root.confirmed_field == "ramped_on_level") {
                 ignore_on_level_changes = true;
                 on_level_target = root.confirmed_value;
-                root.data.on_level = Math.round((root.confirmed_value / 1000.0) * 255.0);
+                root.data.on_level = root.confirmed_value / 10.0;
                 on_level_value = root.confirmed_value;
                 root.changed();
             } else if (root.confirmed_field == "ramped_attack") {
@@ -81,7 +81,7 @@ export component RampedModeParams inherits VerticalLayout {
                     on_level_target = -1;
                 }
             } else {
-                root.data.on_level = Math.round((new_value / 1000.0) * 255.0);
+                root.data.on_level = new_value / 10.0;
                 root.changed();
             }
         }

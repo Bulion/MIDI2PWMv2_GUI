@@ -5,8 +5,8 @@ import { AppStyle } from "../style.slint";
 export struct CCControlModeData {
     cc_number: int,
     center_value: int,
-    left_max_pwm: int,
-    right_max_pwm: int,
+    left_max_pwm: float,
+    right_max_pwm: float,
     deadband_range: int,
 }
 
@@ -14,8 +14,8 @@ export component CCControlModeParams inherits VerticalLayout {
     in-out property <CCControlModeData> data: {
         cc_number: 1,
         center_value: 64,
-        left_max_pwm: 255,
-        right_max_pwm: 255,
+        left_max_pwm: 100.0,
+        right_max_pwm: 100.0,
         deadband_range: 2,
     };
 
@@ -26,8 +26,8 @@ export component CCControlModeParams inherits VerticalLayout {
 
     in-out property <int> cc_number_value: root.data.cc_number;
     in-out property <int> center_value_value: root.data.center_value;
-    in-out property <int> left_pwm_value: Math.round((root.data.left_max_pwm / 255.0) * 1000.0);
-    in-out property <int> right_pwm_value: Math.round((root.data.right_max_pwm / 255.0) * 1000.0);
+    in-out property <int> left_pwm_value: Math.round(root.data.left_max_pwm * 10.0);
+    in-out property <int> right_pwm_value: Math.round(root.data.right_max_pwm * 10.0);
     in-out property <int> deadband_value: root.data.deadband_range;
 
     private property <bool> ignore_cc_number_changes: false;
@@ -64,13 +64,13 @@ export component CCControlModeParams inherits VerticalLayout {
             } else if (root.confirmed_field == "cc_left_pwm") {
                 ignore_left_pwm_changes = true;
                 left_pwm_target = root.confirmed_value;
-                root.data.left_max_pwm = Math.round((root.confirmed_value / 1000.0) * 255.0);
+                root.data.left_max_pwm = root.confirmed_value / 10.0;
                 left_pwm_value = root.confirmed_value;
                 root.changed();
             } else if (root.confirmed_field == "cc_right_pwm") {
                 ignore_right_pwm_changes = true;
                 right_pwm_target = root.confirmed_value;
-                root.data.right_max_pwm = Math.round((root.confirmed_value / 1000.0) * 255.0);
+                root.data.right_max_pwm = root.confirmed_value / 10.0;
                 right_pwm_value = root.confirmed_value;
                 root.changed();
             } else if (root.confirmed_field == "cc_deadband") {
@@ -193,7 +193,7 @@ export component CCControlModeParams inherits VerticalLayout {
                     left_pwm_target = -1;
                 }
             } else {
-                root.data.left_max_pwm = Math.round((new_value / 1000.0) * 255.0);
+                root.data.left_max_pwm = new_value / 10.0;
                 root.changed();
             }
         }
@@ -219,7 +219,7 @@ export component CCControlModeParams inherits VerticalLayout {
                     right_pwm_target = -1;
                 }
             } else {
-                root.data.right_max_pwm = Math.round((new_value / 1000.0) * 255.0);
+                root.data.right_max_pwm = new_value / 10.0;
                 root.changed();
             }
         }

@@ -9,19 +9,19 @@ import { PitchBendModeData } from "mode-params/pitchbend-mode-params.slint";
 
 export global DefaultModels {
     out property <InstantModeData> instant: {
-        on_level: 255,
+        on_level: 100.0,
         velocity_sensitive: true,
     };
 
     out property <RampedModeData> ramped: {
-        on_level: 255,
+        on_level: 100.0,
         velocity_sensitive: true,
         attack_time_ms: 100,
         release_time_ms: 100,
     };
 
     out property <PulseModeData> pulse: {
-        on_level: 255,
+        on_level: 100.0,
         velocity_sensitive: true,
         attack_time_ms: 10,
         hold_time_ms: 100,
@@ -29,14 +29,14 @@ export global DefaultModels {
     };
 
     out property <ToggleModeData> toggle: {
-        on_level: 255,
+        on_level: 100.0,
         velocity_sensitive: false,
         debounce_delay_ms: 50,
     };
 
     out property <ADSRModeData> adsr: {
-        attack_level: 255,
-        sustain_level: 200,
+        attack_level: 100.0,
+        sustain_level: 78.4,
         velocity_sensitive: true,
         attack_time_ms: 50,
         decay_time_ms: 100,
@@ -46,14 +46,14 @@ export global DefaultModels {
     out property <CCControlModeData> cc_control: {
         cc_number: 1,
         center_value: 64,
-        left_max_pwm: 255,
-        right_max_pwm: 255,
+        left_max_pwm: 100.0,
+        right_max_pwm: 100.0,
         deadband_range: 2,
     };
 
     out property <PitchBendModeData> pitchbend: {
-        base_level: 128,
-        bend_range: 64,
+        base_level: 50.2,
+        bend_range: 25.1,
         unipolar: false,
         velocity_sensitive: true,
     };

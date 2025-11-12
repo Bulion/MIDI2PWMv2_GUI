@@ -3,14 +3,14 @@ import { SliderWithPopup } from "../slider-with-popup.slint";
 import { AppStyle } from "../style.slint";
 
 export struct ToggleModeData {
-    on_level: int,
+    on_level: float,
     velocity_sensitive: bool,
     debounce_delay_ms: int,
 }
 
 export component ToggleModeParams inherits VerticalLayout {
     in-out property <ToggleModeData> data: {
-        on_level: 255,
+        on_level: 100.0,
         velocity_sensitive: false,
         debounce_delay_ms: 50,
     };
@@ -18,7 +18,7 @@ export component ToggleModeParams inherits VerticalLayout {
     in property <int> confirmed_value: -1;
     in property <string> confirmed_field: "";
 
-    in-out property <int> on_level_value: Math.round((root.data.on_level / 255.0) * 1000.0);
+    in-out property <int> on_level_value: Math.round(root.data.on_level * 10.0);
     in-out property <int> debounce_value: root.data.debounce_delay_ms;
 
     private property <bool> ignore_on_level_changes: false;
@@ -35,7 +35,7 @@ export component ToggleModeParams inherits VerticalLayout {
             if (root.confirmed_field == "toggle_on_level") {
                 ignore_on_level_changes = true;
                 on_level_target = root.confirmed_value;
-                root.data.on_level = Math.round((root.confirmed_value / 1000.0) * 255.0);
+                root.data.on_level = root.confirmed_value / 10.0;
                 on_level_value = root.confirmed_value;
                 root.changed();
             } else if (root.confirmed_field == "toggle_debounce") {
@@ -70,7 +70,7 @@ export component ToggleModeParams inherits VerticalLayout {
                     on_level_target = -1;
                 }
             } else {
-                root.data.on_level = Math.round((new_value / 1000.0) * 255.0);
+                root.data.on_level = new_value / 10.0;
                 root.changed();
             }
         }

@@ -13,15 +13,25 @@
 namespace gui::common
 {
 
+inline constexpr float deviceToUiPercent(std::uint8_t deviceValue)
+{
+    return (static_cast<float>(deviceValue) / 255.0F) * 100.0F;
+}
+
+inline constexpr std::uint8_t uiPercentToDevice(float uiPercent)
+{
+    return static_cast<std::uint8_t>((uiPercent / 100.0F) * 255.0F + 0.5F);
+}
+
 struct InstantModeData
 {
-    std::uint8_t on_level;
+    float on_level;
     bool velocity_sensitive;
 };
 
 struct RampedModeData
 {
-    std::uint8_t on_level;
+    float on_level;
     bool velocity_sensitive;
     std::uint16_t attack_time_ms;
     std::uint16_t release_time_ms;
@@ -29,7 +39,7 @@ struct RampedModeData
 
 struct PulseModeData
 {
-    std::uint8_t on_level;
+    float on_level;
     bool velocity_sensitive;
     std::uint16_t attack_time_ms;
     std::uint16_t hold_time_ms;
@@ -38,15 +48,15 @@ struct PulseModeData
 
 struct ToggleModeData
 {
-    std::uint8_t on_level;
+    float on_level;
     bool velocity_sensitive;
     std::uint16_t debounce_delay_ms;
 };
 
 struct ADSRModeData
 {
-    std::uint8_t attack_level;
-    std::uint8_t sustain_level;
+    float attack_level;
+    float sustain_level;
     bool velocity_sensitive;
     std::uint16_t attack_time_ms;
     std::uint16_t decay_time_ms;
@@ -57,15 +67,15 @@ struct CCControlModeData
 {
     std::uint8_t cc_number;
     std::uint8_t center_value;
-    std::uint8_t left_max_pwm;
-    std::uint8_t right_max_pwm;
+    float left_max_pwm;
+    float right_max_pwm;
     std::uint8_t deadband_range;
 };
 
 struct PitchBendModeData
 {
-    std::uint8_t base_level;
-    std::uint8_t bend_range;
+    float base_level;
+    float bend_range;
     bool unipolar;
     bool velocity_sensitive;
 };

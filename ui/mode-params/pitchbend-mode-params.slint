@@ -3,16 +3,16 @@ import { SliderWithPopup } from "../slider-with-popup.slint";
 import { AppStyle } from "../style.slint";
 
 export struct PitchBendModeData {
-    base_level: int,
-    bend_range: int,
+    base_level: float,
+    bend_range: float,
     unipolar: bool,
     velocity_sensitive: bool,
 }
 
 export component PitchBendModeParams inherits VerticalLayout {
     in-out property <PitchBendModeData> data: {
-        base_level: 128,
-        bend_range: 64,
+        base_level: 50.2,
+        bend_range: 25.1,
         unipolar: false,
         velocity_sensitive: true,
     };
@@ -20,8 +20,8 @@ export component PitchBendModeParams inherits VerticalLayout {
     in property <int> confirmed_value: -1;
     in property <string> confirmed_field: "";
 
-    in-out property <int> base_level_value: Math.round((root.data.base_level / 255.0) * 1000.0);
-    in-out property <int> bend_range_value: Math.round((root.data.bend_range / 255.0) * 1000.0);
+    in-out property <int> base_level_value: Math.round(root.data.base_level * 10.0);
+    in-out property <int> bend_range_value: Math.round(root.data.bend_range * 10.0);
 
     private property <bool> ignore_base_level_changes: false;
     private property <bool> ignore_bend_range_changes: false;
@@ -37,13 +37,13 @@ export component PitchBendModeParams inherits VerticalLayout {
             if (root.confirmed_field == "pitchbend_base") {
                 ignore_base_level_changes = true;
                 base_level_target = root.confirmed_value;
-                root.data.base_level = Math.round((root.confirmed_value / 1000.0) * 255.0);
+                root.data.base_level = root.confirmed_value / 10.0;
                 base_level_value = root.confirmed_value;
                 root.changed();
             } else if (root.confirmed_field == "pitchbend_range") {
                 ignore_bend_range_changes = true;
                 bend_range_target = root.confirmed_value;
-                root.data.bend_range = Math.round((root.confirmed_value / 1000.0) * 255.0);
+                root.data.bend_range = root.confirmed_value / 10.0;
                 bend_range_value = root.confirmed_value;
                 root.changed();
             }
@@ -72,7 +72,7 @@ export component PitchBendModeParams inherits VerticalLayout {
                     base_level_target = -1;
                 }
             } else {
-                root.data.base_level = Math.round((new_value / 1000.0) * 255.0);
+                root.data.base_level = new_value / 10.0;
                 root.changed();
             }
         }
@@ -98,7 +98,7 @@ export component PitchBendModeParams inherits VerticalLayout {
                     bend_range_target = -1;
                 }
             } else {
-                root.data.bend_range = Math.round((new_value / 1000.0) * 255.0);
+                root.data.bend_range = new_value / 10.0;
                 root.changed();
             }
         }
