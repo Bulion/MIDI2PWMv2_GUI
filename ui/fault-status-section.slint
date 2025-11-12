@@ -1,0 +1,36 @@
+import { Button } from "std-widgets.slint";
+
+export component FaultStatusSection inherits VerticalLayout {
+    in property <string> fault: "";
+
+    callback reset_fault;
+
+    alignment: LayoutAlignment.start;
+    spacing: 8px;
+
+    Rectangle {
+        height: 8px;
+    }
+
+    Text {
+        text: "Fault Status";
+        font-size: 14px;
+        color: #fff;
+        font-weight: 600;
+    }
+
+    Text {
+        text: root.fault == "" ? "None" : root.fault;
+        color: root.fault == "" ? #0f0 : #f66;
+        font-size: 13px;
+    }
+
+    Button {
+        text: "Reset Fault";
+        enabled: root.fault != "";
+        clicked => {
+            root.reset_fault();
+        }
+        width: 100px;
+    }
+}

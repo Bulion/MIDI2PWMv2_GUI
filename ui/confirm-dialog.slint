@@ -1,0 +1,60 @@
+import { Button } from "std-widgets.slint";
+
+export component ConfirmDialog inherits Rectangle {
+    callback save_and_close;
+    callback discard_and_close;
+    callback cancel;
+
+    width: 420px;
+    height: 180px;
+    background: #2a2a2a;
+    border-radius: 8px;
+    border-width: 2px;
+    border-color: #ff9933;
+
+    VerticalLayout {
+        padding: 20px;
+        spacing: 16px;
+
+        Text {
+            text: "Unsaved Changes";
+            font-size: 18px;
+            color: #fff;
+            horizontal-alignment: center;
+        }
+
+        Text {
+            text: "You have unsaved changes. What would you like to do?";
+            font-size: 14px;
+            color: #ccc;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+        }
+
+        HorizontalLayout {
+            spacing: 10px;
+            padding-top: 10px;
+
+            Button {
+                text: "Save";
+                clicked => {
+                    root.save_and_close();
+                }
+            }
+
+            Button {
+                text: "Discard";
+                clicked => {
+                    root.discard_and_close();
+                }
+            }
+
+            Button {
+                text: "Cancel";
+                clicked => {
+                    root.cancel();
+                }
+            }
+        }
+    }
+}

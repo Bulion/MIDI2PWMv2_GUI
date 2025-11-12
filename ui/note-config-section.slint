@@ -1,0 +1,58 @@
+import { Button } from "std-widgets.slint";
+
+export component NoteConfigSection inherits VerticalLayout {
+    in-out property <string> note: "";
+    in-out property <bool> is_assigning_note: false;
+
+    callback assign_note;
+    callback reset_note;
+    callback note_changed;
+
+    alignment: LayoutAlignment.start;
+    spacing: 12px;
+
+    Text {
+        text: "Note Configuration";
+        font-size: 14px;
+        color: #fff;
+        font-weight: 600;
+        height: 24px;
+    }
+
+    Rectangle {
+        height: 36px;
+        background: root.is_assigning_note ? #445533 : transparent;
+        border-radius: 4px;
+        border-width: root.is_assigning_note ? 2px : 0px;
+        border-color: #88cc44;
+
+        Text {
+            text: root.is_assigning_note ? "Waiting for MIDI..." : ("Note: " + root.note);
+            color: root.is_assigning_note ? #88cc44 : #eee;
+            font-size: 16px;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 8px;
+
+        Button {
+            text: "Assign";
+            enabled: !root.is_assigning_note;
+            clicked => {
+                root.assign_note();
+            }
+        }
+
+        Button {
+            text: "Reset";
+            enabled: !root.is_assigning_note;
+            clicked => {
+                root.reset_note();
+                root.note_changed();
+            }
+        }
+    }
+}
