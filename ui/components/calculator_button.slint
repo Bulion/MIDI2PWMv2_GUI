@@ -1,0 +1,28 @@
+import { AppStyle } from "../style.slint";
+
+export component CalculatorButton inherits Rectangle {
+    in property <string> text: "";
+    in property <color> text_color: AppStyle.text_primary;
+    in property <color> button_background: AppStyle.bg_input;
+    in property <color> button_border: AppStyle.border_default;
+
+    callback clicked();
+
+    background: root.button_background;
+    border-width: AppStyle.border_width_thin;
+    border-color: root.button_border;
+
+    Text {
+        text: root.text;
+        font-size: AppStyle.font_size_calculator;
+        color: root.text_color;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    TouchArea {
+        clicked => {
+            root.clicked();
+        }
+    }
+}

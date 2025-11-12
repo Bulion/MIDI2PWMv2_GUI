@@ -8,6 +8,7 @@ import {
 import { ChannelCard } from "channel-card.slint";
 import { ChannelConfigPopup, ModeConfig } from "channel-config-popup.slint";
 import { NumericInputPopup } from "numeric-input-popup.slint";
+import { ModalOverlay } from "components/modal_overlay.slint";
 import { ChannelData } from "channel-data.slint";
 import { DefaultModels } from "default-models-data.slint";
 import { AppStyle } from "style.slint";
@@ -309,19 +310,10 @@ export component AppWindow inherits Window {
         }
     }
 
-    Rectangle {
+    ModalOverlay {
         visible: root.show_numeric_input;
-        z: 400;
-        x: 0px;
-        y: 0px;
-        width: parent.width;
-        height: parent.height;
-        background: AppStyle.overlay_backdrop;
-
-        TouchArea {
-            clicked => {
-                root.show_numeric_input = false;
-            }
+        dismissed => {
+            root.show_numeric_input = false;
         }
 
         NumericInputPopup {

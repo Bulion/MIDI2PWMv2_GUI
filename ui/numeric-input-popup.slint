@@ -1,5 +1,6 @@
 import { Button } from "std-widgets.slint";
 import { AppStyle } from "style.slint";
+import { CalculatorButton } from "components/calculator_button.slint";
 
 export component NumericInputPopup inherits Rectangle {
     in property <int> min_value: 0;
@@ -106,329 +107,162 @@ export component NumericInputPopup inherits Rectangle {
                 GridLayout {
                     spacing: AppStyle.spacing_sm;
                     Row {
-                        Rectangle {
-                            background: AppStyle.bg_input;
-                            border-width: AppStyle.border_width_thin;
-                            border-color: AppStyle.border_default;
-
-                            Text {
-                                text: "7";
-                                font-size: AppStyle.font_size_calculator;
-                                color: AppStyle.text_primary;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-
-                            TouchArea {
-                                clicked => {
-                                    if (root.first_digit_entry) {
+                        CalculatorButton {
+                            text: "7";
+                            clicked => {
+                                if (root.first_digit_entry) {
                                     root.input_text = "7";
                                     first_digit_entry = false;
                                 } else {
                                     root.input_text += "7";
                                 }
-                                }
                             }
                         }
 
-                        Rectangle {
-                            background: AppStyle.bg_input;
-                            border-width: AppStyle.border_width_thin;
-                            border-color: AppStyle.border_default;
-
-                            Text {
-                                text: "8";
-                                font-size: AppStyle.font_size_calculator;
-                                color: AppStyle.text_primary;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-
-                            TouchArea {
-                                clicked => {
-                                    if (root.first_digit_entry) {
+                        CalculatorButton {
+                            text: "8";
+                            clicked => {
+                                if (root.first_digit_entry) {
                                     root.input_text = "8";
                                     first_digit_entry = false;
                                 } else {
                                     root.input_text += "8";
                                 }
-                                }
                             }
                         }
 
-                        Rectangle {
-                            background: AppStyle.bg_input;
-                            border-width: AppStyle.border_width_thin;
-                            border-color: AppStyle.border_default;
-
-                            Text {
-                                text: "9";
-                                font-size: AppStyle.font_size_calculator;
-                                color: AppStyle.text_primary;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-
-                            TouchArea {
-                                clicked => {
-                                    if (root.first_digit_entry) {
+                        CalculatorButton {
+                            text: "9";
+                            clicked => {
+                                if (root.first_digit_entry) {
                                     root.input_text = "9";
                                     first_digit_entry = false;
                                 } else {
                                     root.input_text += "9";
                                 }
-                                }
                             }
                         }
 
-                        Rectangle {
+                        CalculatorButton {
                             col: 3;
                             colspan: 1;
-                            background: AppStyle.bg_button;
-                            border-width: AppStyle.border_width_thin;
-                            border-color: AppStyle.border_default;
-
-                            Text {
-                                text: "←";
-                                font-size: AppStyle.font_size_calculator;
-                                color: AppStyle.text_primary;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-
-                            TouchArea {
-                                clicked => {
-                                    root.input_text = "";
-                                }
+                            text: "←";
+                            button_background: AppStyle.bg_button;
+                            clicked => {
+                                root.input_text = "";
                             }
                         }
                     }
 
                     Row {
-                        Rectangle {
-                            background: AppStyle.bg_input;
-                            border-width: AppStyle.border_width_thin;
-                            border-color: AppStyle.border_default;
-
-                            Text {
-                                text: "4";
-                                font-size: AppStyle.font_size_calculator;
-                                color: AppStyle.text_primary;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-
-                            TouchArea {
-                                clicked => {
-                                    if (root.first_digit_entry) {
+                        CalculatorButton {
+                            text: "4";
+                            clicked => {
+                                if (root.first_digit_entry) {
                                     root.input_text = "4";
                                     first_digit_entry = false;
                                 } else {
                                     root.input_text += "4";
                                 }
-                                }
                             }
                         }
 
-                        Rectangle {
-                            background: AppStyle.bg_input;
-                            border-width: AppStyle.border_width_thin;
-                            border-color: AppStyle.border_default;
-
-                            Text {
-                                text: "5";
-                                font-size: AppStyle.font_size_calculator;
-                                color: AppStyle.text_primary;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-
-                            TouchArea {
-                                clicked => {
-                                    if (root.first_digit_entry) {
+                        CalculatorButton {
+                            text: "5";
+                            clicked => {
+                                if (root.first_digit_entry) {
                                     root.input_text = "5";
                                     first_digit_entry = false;
                                 } else {
                                     root.input_text += "5";
                                 }
-                                }
                             }
                         }
 
-                        Rectangle {
-                            background: AppStyle.bg_input;
-                            border-width: AppStyle.border_width_thin;
-                            border-color: AppStyle.border_default;
-
-                            Text {
-                                text: "6";
-                                font-size: AppStyle.font_size_calculator;
-                                color: AppStyle.text_primary;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-
-                            TouchArea {
-                                clicked => {
-                                    if (root.first_digit_entry) {
+                        CalculatorButton {
+                            text: "6";
+                            clicked => {
+                                if (root.first_digit_entry) {
                                     root.input_text = "6";
                                     first_digit_entry = false;
                                 } else {
                                     root.input_text += "6";
                                 }
-                                }
                             }
                         }
                     }
 
                     Row {
-                        Rectangle {
-                            background: AppStyle.bg_input;
-                            border-width: AppStyle.border_width_thin;
-                            border-color: AppStyle.border_default;
-
-                            Text {
-                                text: "1";
-                                font-size: AppStyle.font_size_calculator;
-                                color: AppStyle.text_primary;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-
-                            TouchArea {
-                                clicked => {
-                                    if (root.first_digit_entry) {
+                        CalculatorButton {
+                            text: "1";
+                            clicked => {
+                                if (root.first_digit_entry) {
                                     root.input_text = "1";
                                     first_digit_entry = false;
                                 } else {
                                     root.input_text += "1";
                                 }
-                                }
                             }
                         }
 
-                        Rectangle {
-                            background: AppStyle.bg_input;
-                            border-width: AppStyle.border_width_thin;
-                            border-color: AppStyle.border_default;
-
-                            Text {
-                                text: "2";
-                                font-size: AppStyle.font_size_calculator;
-                                color: AppStyle.text_primary;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-
-                            TouchArea {
-                                clicked => {
-                                    if (root.first_digit_entry) {
+                        CalculatorButton {
+                            text: "2";
+                            clicked => {
+                                if (root.first_digit_entry) {
                                     root.input_text = "2";
                                     first_digit_entry = false;
                                 } else {
                                     root.input_text += "2";
                                 }
-                                }
                             }
                         }
 
-                        Rectangle {
-                            background: AppStyle.bg_input;
-                            border-width: AppStyle.border_width_thin;
-                            border-color: AppStyle.border_default;
-
-                            Text {
-                                text: "3";
-                                font-size: AppStyle.font_size_calculator;
-                                color: AppStyle.text_primary;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-
-                            TouchArea {
-                                clicked => {
-                                    if (root.first_digit_entry) {
+                        CalculatorButton {
+                            text: "3";
+                            clicked => {
+                                if (root.first_digit_entry) {
                                     root.input_text = "3";
                                     first_digit_entry = false;
                                 } else {
                                     root.input_text += "3";
-                                }
                                 }
                             }
                         }
                     }
 
                     Row {
-                        Rectangle {
-                            background: AppStyle.bg_input;
-                            border-width: AppStyle.border_width_thin;
-                            border-color: AppStyle.border_default;
-
-                            Text {
-                                text: "0";
-                                font-size: AppStyle.font_size_calculator;
-                                color: AppStyle.text_primary;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-
-                            TouchArea {
-                                clicked => {
-                                    if (root.first_digit_entry) {
+                        CalculatorButton {
+                            text: "0";
+                            clicked => {
+                                if (root.first_digit_entry) {
                                     root.input_text = "0";
                                     first_digit_entry = false;
                                 } else {
                                     root.input_text += "0";
                                 }
-                                }
                             }
                         }
 
-                        Rectangle {
-                            background: AppStyle.bg_input;
-                            border-width: AppStyle.border_width_thin;
-                            border-color: AppStyle.border_default;
+                        CalculatorButton {
                             visible: root.max_decimals > 0;
-
-                            Text {
-                                text: ".";
-                                font-size: AppStyle.font_size_calculator;
-                                color: AppStyle.text_primary;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-
-                            TouchArea {
-                                enabled: root.max_decimals > 0;
-                                clicked => {
-                                    if (root.first_digit_entry) {
-                                        root.input_text = "0.";
-                                        first_digit_entry = false;
-                                    } else {
-                                        root.input_text += ".";
-                                    }
+                            text: ".";
+                            clicked => {
+                                if (root.first_digit_entry) {
+                                    root.input_text = "0.";
+                                    first_digit_entry = false;
+                                } else {
+                                    root.input_text += ".";
                                 }
                             }
                         }
 
-                        Rectangle {
+                        CalculatorButton {
                             col: 2;
-                            background: AppStyle.bg_button;
-                            border-width: AppStyle.border_width_thin;
-                            border-color: AppStyle.border_default;
-
-                            Text {
-                                text: "C";
-                                font-size: 20px;
-                                color: #f66;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-
-                            TouchArea {
-                                clicked => {
-                                    root.input_text = "";
-                                }
+                            text: "C";
+                            text_color: #f66;
+                            button_background: AppStyle.bg_button;
+                            clicked => {
+                                root.input_text = "";
                             }
                         }
                     }
