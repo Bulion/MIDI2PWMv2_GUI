@@ -1,4 +1,5 @@
-import { Slider, CheckBox } from "std-widgets.slint";
+import { CheckBox } from "std-widgets.slint";
+import { SliderWithPopup } from "../slider-with-popup.slint";
 
 export struct ToggleModeData {
     on_level: int,
@@ -13,33 +14,64 @@ export component ToggleModeParams inherits VerticalLayout {
         debounce_delay_ms: 50,
     };
 
+    in property <int> confirmed_value: -1;
+    in property <string> confirmed_field: "";
+
+    in-out property <int> on_level_value: Math.round((root.data.on_level / 255.0) * 1000.0);
+    in-out property <int> debounce_value: root.data.debounce_delay_ms;
+
+    private property <bool> ignore_on_level_changes: false;
+    private property <bool> ignore_debounce_changes: false;
+
+    private property <int> on_level_target: -1;
+    private property <int> debounce_target: -1;
+
     callback changed();
+    callback request_numeric_input(int, int, int, string, string, [string], string, bool);
 
-    spacing: 6px;
-
-    HorizontalLayout {
-        spacing: 6px;
-        Text {
-            text: "On Level:";
-            color: #ccc;
-            vertical-alignment: center;
-            width: 70px;
-            font-size: 12px;
-        }
-        Slider {
-            value: root.data.on_level;
-            minimum: 0;
-            maximum: 255;
-            changed(val) => {
-                root.data.on_level = val;
+    changed confirmed_field => {
+        if (root.confirmed_value >= 0) {
+            if (root.confirmed_field == "toggle_on_level") {
+                ignore_on_level_changes = true;
+                on_level_target = root.confirmed_value;
+                root.data.on_level = Math.round((root.confirmed_value / 1000.0) * 255.0);
+                on_level_value = root.confirmed_value;
+                root.changed();
+            } else if (root.confirmed_field == "toggle_debounce") {
+                ignore_debounce_changes = true;
+                debounce_target = root.confirmed_value;
+                root.data.debounce_delay_ms = root.confirmed_value;
+                debounce_value = root.confirmed_value;
                 root.changed();
             }
         }
-        Text {
-            text: root.data.on_level;
-            color: #ccc;
-            width: 35px;
-            font-size: 12px;
+    }
+
+    spacing: 6px;
+
+    SliderWithPopup {
+        label: "On Level";
+        minimum: 0;
+        maximum: 1000;
+        value <=> root.on_level_value;
+        suffix: "%";
+        is_float: true;
+        quick_buttons: ["0", "500", "1000"];
+        field_name: "toggle_on_level";
+        request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
+            ignore_on_level_changes = false;
+            root.request_numeric_input(min, max, val, label, suffix, buttons, field, is_float);
+        }
+        changed(new_value) => {
+            if (root.ignore_on_level_changes) {
+                if (Math.abs(new_value - root.on_level_target) < 5) {
+                    ignore_on_level_changes = false;
+                    on_level_target = -1;
+                }
+            } else {
+                root.data.on_level = Math.round((new_value / 1000.0) * 255.0);
+                root.changed();
+            }
         }
     }
 
@@ -52,29 +84,28 @@ export component ToggleModeParams inherits VerticalLayout {
         }
     }
 
-    HorizontalLayout {
-        spacing: 6px;
-        Text {
-            text: "Debounce:";
-            color: #ccc;
-            vertical-alignment: center;
-            width: 70px;
-            font-size: 12px;
+    SliderWithPopup {
+        label: "Debounce";
+        minimum: 0;
+        maximum: 500;
+        value <=> root.debounce_value;
+        suffix: "ms";
+        quick_buttons: ["0", "50", "100"];
+        field_name: "toggle_debounce";
+        request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
+            ignore_debounce_changes = false;
+            root.request_numeric_input(min, max, val, label, suffix, buttons, field, is_float);
         }
-        Slider {
-            value: root.data.debounce_delay_ms;
-            minimum: 0;
-            maximum: 500;
-            changed(val) => {
-                root.data.debounce_delay_ms = val;
+        changed(new_value) => {
+            if (root.ignore_debounce_changes) {
+                if (Math.abs(new_value - root.debounce_target) < 5) {
+                    ignore_debounce_changes = false;
+                    debounce_target = -1;
+                }
+            } else {
+                root.data.debounce_delay_ms = new_value;
                 root.changed();
             }
-        }
-        Text {
-            text: root.data.debounce_delay_ms;
-            color: #ccc;
-            width: 35px;
-            font-size: 12px;
         }
     }
 }

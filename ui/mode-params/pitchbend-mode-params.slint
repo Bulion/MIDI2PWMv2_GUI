@@ -1,4 +1,5 @@
-import { Slider, CheckBox } from "std-widgets.slint";
+import { CheckBox } from "std-widgets.slint";
+import { SliderWithPopup } from "../slider-with-popup.slint";
 
 export struct PitchBendModeData {
     base_level: int,
@@ -15,59 +16,90 @@ export component PitchBendModeParams inherits VerticalLayout {
         velocity_sensitive: true,
     };
 
+    in property <int> confirmed_value: -1;
+    in property <string> confirmed_field: "";
+
+    in-out property <int> base_level_value: Math.round((root.data.base_level / 255.0) * 1000.0);
+    in-out property <int> bend_range_value: Math.round((root.data.bend_range / 255.0) * 1000.0);
+
+    private property <bool> ignore_base_level_changes: false;
+    private property <bool> ignore_bend_range_changes: false;
+
+    private property <int> base_level_target: -1;
+    private property <int> bend_range_target: -1;
+
     callback changed();
+    callback request_numeric_input(int, int, int, string, string, [string], string, bool);
 
-    spacing: 6px;
-
-    HorizontalLayout {
-        spacing: 6px;
-        Text {
-            text: "Base Level:";
-            color: #ccc;
-            vertical-alignment: center;
-            width: 90px;
-            font-size: 12px;
-        }
-        Slider {
-            value: root.data.base_level;
-            minimum: 0;
-            maximum: 255;
-            changed(val) => {
-                root.data.base_level = val;
+    changed confirmed_field => {
+        if (root.confirmed_value >= 0) {
+            if (root.confirmed_field == "pitchbend_base") {
+                ignore_base_level_changes = true;
+                base_level_target = root.confirmed_value;
+                root.data.base_level = Math.round((root.confirmed_value / 1000.0) * 255.0);
+                base_level_value = root.confirmed_value;
+                root.changed();
+            } else if (root.confirmed_field == "pitchbend_range") {
+                ignore_bend_range_changes = true;
+                bend_range_target = root.confirmed_value;
+                root.data.bend_range = Math.round((root.confirmed_value / 1000.0) * 255.0);
+                bend_range_value = root.confirmed_value;
                 root.changed();
             }
-        }
-        Text {
-            text: root.data.base_level;
-            color: #ccc;
-            width: 35px;
-            font-size: 12px;
         }
     }
 
-    HorizontalLayout {
-        spacing: 6px;
-        Text {
-            text: "Bend Range:";
-            color: #ccc;
-            vertical-alignment: center;
-            width: 90px;
-            font-size: 12px;
+    spacing: 6px;
+
+    SliderWithPopup {
+        label: "Base Level";
+        minimum: 0;
+        maximum: 1000;
+        value <=> root.base_level_value;
+        suffix: "%";
+        is_float: true;
+        quick_buttons: ["0", "500", "1000"];
+        field_name: "pitchbend_base";
+        request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
+            ignore_base_level_changes = false;
+            root.request_numeric_input(min, max, val, label, suffix, buttons, field, is_float);
         }
-        Slider {
-            value: root.data.bend_range;
-            minimum: 0;
-            maximum: 255;
-            changed(val) => {
-                root.data.bend_range = val;
+        changed(new_value) => {
+            if (root.ignore_base_level_changes) {
+                if (Math.abs(new_value - root.base_level_target) < 5) {
+                    ignore_base_level_changes = false;
+                    base_level_target = -1;
+                }
+            } else {
+                root.data.base_level = Math.round((new_value / 1000.0) * 255.0);
                 root.changed();
             }
         }
-        Text {
-            text: root.data.bend_range;
-            color: #ccc;
-            width: 35px;
-            font-size: 12px;
+    }
+
+    SliderWithPopup {
+        label: "Bend Range";
+        minimum: 0;
+        maximum: 1000;
+        value <=> root.bend_range_value;
+        suffix: "%";
+        is_float: true;
+        quick_buttons: ["0", "500", "1000"];
+        field_name: "pitchbend_range";
+        request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
+            ignore_bend_range_changes = false;
+            root.request_numeric_input(min, max, val, label, suffix, buttons, field, is_float);
+        }
+        changed(new_value) => {
+            if (root.ignore_bend_range_changes) {
+                if (Math.abs(new_value - root.bend_range_target) < 5) {
+                    ignore_bend_range_changes = false;
+                    bend_range_target = -1;
+                }
+            } else {
+                root.data.bend_range = Math.round((new_value / 1000.0) * 255.0);
+                root.changed();
+            }
         }
     }
 

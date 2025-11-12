@@ -1,4 +1,5 @@
-import { Slider, CheckBox } from "std-widgets.slint";
+import { CheckBox } from "std-widgets.slint";
+import { SliderWithPopup } from "../slider-with-popup.slint";
 
 export struct ADSRModeData {
     attack_level: int,
@@ -19,59 +20,117 @@ export component ADSRModeParams inherits VerticalLayout {
         release_time_ms: 200,
     };
 
+    in property <int> confirmed_value: -1;
+    in property <string> confirmed_field: "";
+
+    in-out property <int> attack_level_value: Math.round((root.data.attack_level / 255.0) * 1000.0);
+    in-out property <int> sustain_level_value: Math.round((root.data.sustain_level / 255.0) * 1000.0);
+    in-out property <int> attack_time_value: root.data.attack_time_ms;
+    in-out property <int> decay_time_value: root.data.decay_time_ms;
+    in-out property <int> release_time_value: root.data.release_time_ms;
+
+    private property <bool> ignore_attack_level_changes: false;
+    private property <bool> ignore_sustain_level_changes: false;
+    private property <bool> ignore_attack_time_changes: false;
+    private property <bool> ignore_decay_time_changes: false;
+    private property <bool> ignore_release_time_changes: false;
+
+    private property <int> attack_level_target: -1;
+    private property <int> sustain_level_target: -1;
+    private property <int> attack_time_target: -1;
+    private property <int> decay_time_target: -1;
+    private property <int> release_time_target: -1;
+
     callback changed();
+    callback request_numeric_input(int, int, int, string, string, [string], string, bool);
 
-    spacing: 6px;
-
-    HorizontalLayout {
-        spacing: 6px;
-        Text {
-            text: "Attack Level:";
-            color: #ccc;
-            vertical-alignment: center;
-            width: 90px;
-            font-size: 12px;
-        }
-        Slider {
-            value: root.data.attack_level;
-            minimum: 0;
-            maximum: 255;
-            changed(val) => {
-                root.data.attack_level = val;
+    changed confirmed_field => {
+        if (root.confirmed_value >= 0) {
+            if (root.confirmed_field == "adsr_attack_level") {
+                ignore_attack_level_changes = true;
+                attack_level_target = root.confirmed_value;
+                root.data.attack_level = Math.round((root.confirmed_value / 1000.0) * 255.0);
+                attack_level_value = root.confirmed_value;
+                root.changed();
+            } else if (root.confirmed_field == "adsr_sustain_level") {
+                ignore_sustain_level_changes = true;
+                sustain_level_target = root.confirmed_value;
+                root.data.sustain_level = Math.round((root.confirmed_value / 1000.0) * 255.0);
+                sustain_level_value = root.confirmed_value;
+                root.changed();
+            } else if (root.confirmed_field == "adsr_attack") {
+                ignore_attack_time_changes = true;
+                attack_time_target = root.confirmed_value;
+                root.data.attack_time_ms = root.confirmed_value;
+                attack_time_value = root.confirmed_value;
+                root.changed();
+            } else if (root.confirmed_field == "adsr_decay") {
+                ignore_decay_time_changes = true;
+                decay_time_target = root.confirmed_value;
+                root.data.decay_time_ms = root.confirmed_value;
+                decay_time_value = root.confirmed_value;
+                root.changed();
+            } else if (root.confirmed_field == "adsr_release") {
+                ignore_release_time_changes = true;
+                release_time_target = root.confirmed_value;
+                root.data.release_time_ms = root.confirmed_value;
+                release_time_value = root.confirmed_value;
                 root.changed();
             }
-        }
-        Text {
-            text: root.data.attack_level;
-            color: #ccc;
-            width: 35px;
-            font-size: 12px;
         }
     }
 
-    HorizontalLayout {
-        spacing: 6px;
-        Text {
-            text: "Sustain Level:";
-            color: #ccc;
-            vertical-alignment: center;
-            width: 90px;
-            font-size: 12px;
+    spacing: 6px;
+
+    SliderWithPopup {
+        label: "Attack Level";
+        minimum: 0;
+        maximum: 1000;
+        value <=> root.attack_level_value;
+        suffix: "%";
+        is_float: true;
+        quick_buttons: ["0", "500", "1000"];
+        field_name: "adsr_attack_level";
+        request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
+            ignore_attack_level_changes = false;
+            root.request_numeric_input(min, max, val, label, suffix, buttons, field, is_float);
         }
-        Slider {
-            value: root.data.sustain_level;
-            minimum: 0;
-            maximum: 255;
-            changed(val) => {
-                root.data.sustain_level = val;
+        changed(new_value) => {
+            if (root.ignore_attack_level_changes) {
+                if (Math.abs(new_value - root.attack_level_target) < 5) {
+                    ignore_attack_level_changes = false;
+                    attack_level_target = -1;
+                }
+            } else {
+                root.data.attack_level = Math.round((new_value / 1000.0) * 255.0);
                 root.changed();
             }
         }
-        Text {
-            text: root.data.sustain_level;
-            color: #ccc;
-            width: 35px;
-            font-size: 12px;
+    }
+
+    SliderWithPopup {
+        label: "Sustain Level";
+        minimum: 0;
+        maximum: 1000;
+        value <=> root.sustain_level_value;
+        suffix: "%";
+        is_float: true;
+        quick_buttons: ["0", "500", "1000"];
+        field_name: "adsr_sustain_level";
+        request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
+            ignore_sustain_level_changes = false;
+            root.request_numeric_input(min, max, val, label, suffix, buttons, field, is_float);
+        }
+        changed(new_value) => {
+            if (root.ignore_sustain_level_changes) {
+                if (Math.abs(new_value - root.sustain_level_target) < 5) {
+                    ignore_sustain_level_changes = false;
+                    sustain_level_target = -1;
+                }
+            } else {
+                root.data.sustain_level = Math.round((new_value / 1000.0) * 255.0);
+                root.changed();
+            }
         }
     }
 
@@ -84,81 +143,78 @@ export component ADSRModeParams inherits VerticalLayout {
         }
     }
 
-    HorizontalLayout {
-        spacing: 6px;
-        Text {
-            text: "Attack:";
-            color: #ccc;
-            vertical-alignment: center;
-            width: 90px;
-            font-size: 12px;
+    SliderWithPopup {
+        label: "Attack";
+        minimum: 0;
+        maximum: 1000;
+        value <=> root.attack_time_value;
+        suffix: "ms";
+        quick_buttons: ["0", "500", "1000"];
+        field_name: "adsr_attack";
+        request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
+            ignore_attack_time_changes = false;
+            root.request_numeric_input(min, max, val, label, suffix, buttons, field, is_float);
         }
-        Slider {
-            value: root.data.attack_time_ms;
-            minimum: 0;
-            maximum: 1000;
-            changed(val) => {
-                root.data.attack_time_ms = val;
+        changed(new_value) => {
+            if (root.ignore_attack_time_changes) {
+                if (Math.abs(new_value - root.attack_time_target) < 5) {
+                    ignore_attack_time_changes = false;
+                    attack_time_target = -1;
+                }
+            } else {
+                root.data.attack_time_ms = new_value;
                 root.changed();
             }
-        }
-        Text {
-            text: root.data.attack_time_ms;
-            color: #ccc;
-            width: 35px;
-            font-size: 12px;
         }
     }
 
-    HorizontalLayout {
-        spacing: 6px;
-        Text {
-            text: "Decay:";
-            color: #ccc;
-            vertical-alignment: center;
-            width: 90px;
-            font-size: 12px;
+    SliderWithPopup {
+        label: "Decay";
+        minimum: 0;
+        maximum: 1000;
+        value <=> root.decay_time_value;
+        suffix: "ms";
+        quick_buttons: ["0", "500", "1000"];
+        field_name: "adsr_decay";
+        request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
+            ignore_decay_time_changes = false;
+            root.request_numeric_input(min, max, val, label, suffix, buttons, field, is_float);
         }
-        Slider {
-            value: root.data.decay_time_ms;
-            minimum: 0;
-            maximum: 1000;
-            changed(val) => {
-                root.data.decay_time_ms = val;
+        changed(new_value) => {
+            if (root.ignore_decay_time_changes) {
+                if (Math.abs(new_value - root.decay_time_target) < 5) {
+                    ignore_decay_time_changes = false;
+                    decay_time_target = -1;
+                }
+            } else {
+                root.data.decay_time_ms = new_value;
                 root.changed();
             }
-        }
-        Text {
-            text: root.data.decay_time_ms;
-            color: #ccc;
-            width: 35px;
-            font-size: 12px;
         }
     }
 
-    HorizontalLayout {
-        spacing: 6px;
-        Text {
-            text: "Release:";
-            color: #ccc;
-            vertical-alignment: center;
-            width: 90px;
-            font-size: 12px;
+    SliderWithPopup {
+        label: "Release";
+        minimum: 0;
+        maximum: 1000;
+        value <=> root.release_time_value;
+        suffix: "ms";
+        quick_buttons: ["0", "500", "1000"];
+        field_name: "adsr_release";
+        request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
+            ignore_release_time_changes = false;
+            root.request_numeric_input(min, max, val, label, suffix, buttons, field, is_float);
         }
-        Slider {
-            value: root.data.release_time_ms;
-            minimum: 0;
-            maximum: 1000;
-            changed(val) => {
-                root.data.release_time_ms = val;
+        changed(new_value) => {
+            if (root.ignore_release_time_changes) {
+                if (Math.abs(new_value - root.release_time_target) < 5) {
+                    ignore_release_time_changes = false;
+                    release_time_target = -1;
+                }
+            } else {
+                root.data.release_time_ms = new_value;
                 root.changed();
             }
-        }
-        Text {
-            text: root.data.release_time_ms;
-            color: #ccc;
-            width: 35px;
-            font-size: 12px;
         }
     }
 }

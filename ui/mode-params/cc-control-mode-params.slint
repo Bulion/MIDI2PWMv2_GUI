@@ -1,4 +1,5 @@
-import { Slider } from "std-widgets.slint";
+import { Button } from "std-widgets.slint";
+import { SliderWithPopup } from "../slider-with-popup.slint";
 
 export struct CCControlModeData {
     cc_number: int,
@@ -17,137 +18,233 @@ export component CCControlModeParams inherits VerticalLayout {
         deadband_range: 2,
     };
 
+    in property <int> confirmed_value: -1;
+    in property <string> confirmed_field: "";
+
+    in-out property <bool> is_assigning_cc: false;
+
+    in-out property <int> cc_number_value: root.data.cc_number;
+    in-out property <int> center_value_value: root.data.center_value;
+    in-out property <int> left_pwm_value: Math.round((root.data.left_max_pwm / 255.0) * 1000.0);
+    in-out property <int> right_pwm_value: Math.round((root.data.right_max_pwm / 255.0) * 1000.0);
+    in-out property <int> deadband_value: root.data.deadband_range;
+
+    private property <bool> ignore_cc_number_changes: false;
+    private property <bool> ignore_center_value_changes: false;
+    private property <bool> ignore_left_pwm_changes: false;
+    private property <bool> ignore_right_pwm_changes: false;
+    private property <bool> ignore_deadband_changes: false;
+
+    private property <int> cc_number_target: -1;
+    private property <int> center_value_target: -1;
+    private property <int> left_pwm_target: -1;
+    private property <int> right_pwm_target: -1;
+    private property <int> deadband_target: -1;
+
     callback changed();
+    callback request_numeric_input(int, int, int, string, string, [string], string, bool);
+    callback assign_cc;
+    callback reset_cc;
+
+    changed confirmed_field => {
+        if (root.confirmed_value >= 0) {
+            if (root.confirmed_field == "cc_number") {
+                ignore_cc_number_changes = true;
+                cc_number_target = root.confirmed_value;
+                root.data.cc_number = root.confirmed_value;
+                cc_number_value = root.confirmed_value;
+                root.changed();
+            } else if (root.confirmed_field == "cc_center") {
+                ignore_center_value_changes = true;
+                center_value_target = root.confirmed_value;
+                root.data.center_value = root.confirmed_value;
+                center_value_value = root.confirmed_value;
+                root.changed();
+            } else if (root.confirmed_field == "cc_left_pwm") {
+                ignore_left_pwm_changes = true;
+                left_pwm_target = root.confirmed_value;
+                root.data.left_max_pwm = Math.round((root.confirmed_value / 1000.0) * 255.0);
+                left_pwm_value = root.confirmed_value;
+                root.changed();
+            } else if (root.confirmed_field == "cc_right_pwm") {
+                ignore_right_pwm_changes = true;
+                right_pwm_target = root.confirmed_value;
+                root.data.right_max_pwm = Math.round((root.confirmed_value / 1000.0) * 255.0);
+                right_pwm_value = root.confirmed_value;
+                root.changed();
+            } else if (root.confirmed_field == "cc_deadband") {
+                ignore_deadband_changes = true;
+                deadband_target = root.confirmed_value;
+                root.data.deadband_range = root.confirmed_value;
+                deadband_value = root.confirmed_value;
+                root.changed();
+            }
+        }
+    }
 
     spacing: 6px;
 
-    HorizontalLayout {
-        spacing: 6px;
+    Rectangle {
+        height: 36px;
+        background: root.is_assigning_cc ? #445533 : transparent;
+        border-width: root.is_assigning_cc ? 2px : 0px;
+        border-color: #88cc44;
+
         Text {
-            text: "CC Number:";
-            color: #ccc;
+            text: root.is_assigning_cc ? "Waiting for CC..." : ("CC: " + root.data.cc_number);
+            color: root.is_assigning_cc ? #88cc44 : #eee;
+            font-size: 14px;
+            horizontal-alignment: center;
             vertical-alignment: center;
-            width: 90px;
-            font-size: 12px;
-        }
-        Slider {
-            value: root.data.cc_number;
-            minimum: 0;
-            maximum: 127;
-            changed(val) => {
-                root.data.cc_number = val;
-                root.changed();
-            }
-        }
-        Text {
-            text: root.data.cc_number;
-            color: #ccc;
-            width: 35px;
-            font-size: 12px;
         }
     }
 
     HorizontalLayout {
-        spacing: 6px;
-        Text {
-            text: "Center Value:";
-            color: #ccc;
-            vertical-alignment: center;
-            width: 90px;
-            font-size: 12px;
-        }
-        Slider {
-            value: root.data.center_value;
-            minimum: 0;
-            maximum: 127;
-            changed(val) => {
-                root.data.center_value = val;
-                root.changed();
+        spacing: 8px;
+
+        Button {
+            text: "Assign CC";
+            enabled: !root.is_assigning_cc;
+            clicked => {
+                root.assign_cc();
+                root.is_assigning_cc = true;
             }
         }
-        Text {
-            text: root.data.center_value;
-            color: #ccc;
-            width: 35px;
-            font-size: 12px;
+
+        Button {
+            text: "Reset CC";
+            enabled: !root.is_assigning_cc;
+            clicked => {
+                root.reset_cc();
+            }
         }
     }
 
-    HorizontalLayout {
-        spacing: 6px;
-        Text {
-            text: "Left Max:";
-            color: #ccc;
-            vertical-alignment: center;
-            width: 90px;
-            font-size: 12px;
+    Rectangle {
+        height: 8px;
+    }
+
+    SliderWithPopup {
+        label: "CC Number";
+        minimum: 0;
+        maximum: 127;
+        value <=> root.cc_number_value;
+        quick_buttons: ["1", "64", "127"];
+        field_name: "cc_number";
+        request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
+            ignore_cc_number_changes = false;
+            root.request_numeric_input(min, max, val, label, suffix, buttons, field, is_float);
         }
-        Slider {
-            value: root.data.left_max_pwm;
-            minimum: 0;
-            maximum: 255;
-            changed(val) => {
-                root.data.left_max_pwm = val;
+        changed(new_value) => {
+            if (root.ignore_cc_number_changes) {
+                if (Math.abs(new_value - root.cc_number_target) < 5) {
+                    ignore_cc_number_changes = false;
+                    cc_number_target = -1;
+                }
+            } else {
+                root.data.cc_number = new_value;
                 root.changed();
             }
-        }
-        Text {
-            text: root.data.left_max_pwm;
-            color: #ccc;
-            width: 35px;
-            font-size: 12px;
         }
     }
 
-    HorizontalLayout {
-        spacing: 6px;
-        Text {
-            text: "Right Max:";
-            color: #ccc;
-            vertical-alignment: center;
-            width: 90px;
-            font-size: 12px;
+    SliderWithPopup {
+        label: "Center Value";
+        minimum: 0;
+        maximum: 127;
+        value <=> root.center_value_value;
+        quick_buttons: ["0", "64", "127"];
+        field_name: "cc_center";
+        request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
+            ignore_center_value_changes = false;
+            root.request_numeric_input(min, max, val, label, suffix, buttons, field, is_float);
         }
-        Slider {
-            value: root.data.right_max_pwm;
-            minimum: 0;
-            maximum: 255;
-            changed(val) => {
-                root.data.right_max_pwm = val;
+        changed(new_value) => {
+            if (root.ignore_center_value_changes) {
+                if (Math.abs(new_value - root.center_value_target) < 5) {
+                    ignore_center_value_changes = false;
+                    center_value_target = -1;
+                }
+            } else {
+                root.data.center_value = new_value;
                 root.changed();
             }
-        }
-        Text {
-            text: root.data.right_max_pwm;
-            color: #ccc;
-            width: 35px;
-            font-size: 12px;
         }
     }
 
-    HorizontalLayout {
-        spacing: 6px;
-        Text {
-            text: "Deadband:";
-            color: #ccc;
-            vertical-alignment: center;
-            width: 90px;
-            font-size: 12px;
+    SliderWithPopup {
+        label: "Left Max PWM";
+        minimum: 0;
+        maximum: 1000;
+        value <=> root.left_pwm_value;
+        suffix: "%";
+        is_float: true;
+        quick_buttons: ["0", "500", "1000"];
+        field_name: "cc_left_pwm";
+        request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
+            ignore_left_pwm_changes = false;
+            root.request_numeric_input(min, max, val, label, suffix, buttons, field, is_float);
         }
-        Slider {
-            value: root.data.deadband_range;
-            minimum: 0;
-            maximum: 20;
-            changed(val) => {
-                root.data.deadband_range = val;
+        changed(new_value) => {
+            if (root.ignore_left_pwm_changes) {
+                if (Math.abs(new_value - root.left_pwm_target) < 5) {
+                    ignore_left_pwm_changes = false;
+                    left_pwm_target = -1;
+                }
+            } else {
+                root.data.left_max_pwm = Math.round((new_value / 1000.0) * 255.0);
                 root.changed();
             }
         }
-        Text {
-            text: root.data.deadband_range;
-            color: #ccc;
-            width: 35px;
-            font-size: 12px;
+    }
+
+    SliderWithPopup {
+        label: "Right Max PWM";
+        minimum: 0;
+        maximum: 1000;
+        value <=> root.right_pwm_value;
+        suffix: "%";
+        is_float: true;
+        quick_buttons: ["0", "500", "1000"];
+        field_name: "cc_right_pwm";
+        request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
+            ignore_right_pwm_changes = false;
+            root.request_numeric_input(min, max, val, label, suffix, buttons, field, is_float);
+        }
+        changed(new_value) => {
+            if (root.ignore_right_pwm_changes) {
+                if (Math.abs(new_value - root.right_pwm_target) < 5) {
+                    ignore_right_pwm_changes = false;
+                    right_pwm_target = -1;
+                }
+            } else {
+                root.data.right_max_pwm = Math.round((new_value / 1000.0) * 255.0);
+                root.changed();
+            }
+        }
+    }
+
+    SliderWithPopup {
+        label: "Deadband";
+        minimum: 0;
+        maximum: 20;
+        value <=> root.deadband_value;
+        quick_buttons: ["0", "5", "10"];
+        field_name: "cc_deadband";
+        request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
+            ignore_deadband_changes = false;
+            root.request_numeric_input(min, max, val, label, suffix, buttons, field, is_float);
+        }
+        changed(new_value) => {
+            if (root.ignore_deadband_changes) {
+                if (Math.abs(new_value - root.deadband_target) < 5) {
+                    ignore_deadband_changes = false;
+                    deadband_target = -1;
+                }
+            } else {
+                root.data.deadband_range = new_value;
+                root.changed();
+            }
         }
     }
 }

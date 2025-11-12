@@ -1,4 +1,5 @@
-import { Slider, CheckBox } from "std-widgets.slint";
+import { CheckBox } from "std-widgets.slint";
+import { SliderWithPopup } from "../slider-with-popup.slint";
 
 export struct InstantModeData {
     on_level: int,
@@ -11,33 +12,51 @@ export component InstantModeParams inherits VerticalLayout {
         velocity_sensitive: true,
     };
 
+    in property <int> confirmed_value: -1;
+    in property <string> confirmed_field: "";
+
+    in-out property <int> on_level_value: Math.round((root.data.on_level / 255.0) * 1000.0);
+    private property <bool> ignore-slider-changes: false;
+    private property <int> target-value: -1;
+
     callback changed();
+    callback request_numeric_input(int, int, int, string, string, [string], string, bool);
+
+    changed confirmed_field => {
+        if (root.confirmed_field == "instant_on_level" && root.confirmed_value >= 0) {
+            ignore-slider-changes = true;
+            target-value = root.confirmed_value;
+            root.data.on_level = Math.round((root.confirmed_value / 1000.0) * 255.0);
+            on_level_value = root.confirmed_value;
+            root.changed();
+        }
+    }
 
     spacing: 6px;
 
-    HorizontalLayout {
-        spacing: 6px;
-        Text {
-            text: "On Level:";
-            color: #ccc;
-            vertical-alignment: center;
-            width: 70px;
-            font-size: 12px;
+    SliderWithPopup {
+        label: "On Level";
+        minimum: 0;
+        maximum: 1000;
+        value <=> root.on_level_value;
+        suffix: "%";
+        is_float: true;
+        quick_buttons: ["0", "500", "1000"];
+        field_name: "instant_on_level";
+        request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
+            ignore-slider-changes = false;
+            root.request_numeric_input(min, max, val, label, suffix, buttons, field, is_float);
         }
-        Slider {
-            value: root.data.on_level;
-            minimum: 0;
-            maximum: 255;
-            changed(val) => {
-                root.data.on_level = val;
+        changed(new_value) => {
+            if (root.ignore-slider-changes) {
+                if (Math.abs(new_value - root.target-value) < 5) {
+                    ignore-slider-changes = false;
+                    target-value = -1;
+                }
+            } else {
+                root.data.on_level = Math.round((new_value / 1000.0) * 255.0);
                 root.changed();
             }
-        }
-        Text {
-            text: root.data.on_level;
-            color: #ccc;
-            width: 35px;
-            font-size: 12px;
         }
     }
 
