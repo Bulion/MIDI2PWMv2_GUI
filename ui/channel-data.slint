@@ -1,0 +1,24 @@
+import { InstantModeData } from "mode-params/instant-mode-params.slint";
+import { RampedModeData } from "mode-params/ramped-mode-params.slint";
+import { PulseModeData } from "mode-params/pulse-mode-params.slint";
+import { ToggleModeData } from "mode-params/toggle-mode-params.slint";
+import { ADSRModeData } from "mode-params/adsr-mode-params.slint";
+import { CCControlModeData } from "mode-params/cc-control-mode-params.slint";
+import { PitchBendModeData } from "mode-params/pitchbend-mode-params.slint";
+
+export struct ChannelData {
+    note: string,
+    voltage: float,
+    current: float,
+    duty_cycle: float,
+    is_active: bool,
+    fault: string,
+    mode_type: int,
+    instant_data: InstantModeData,
+    ramped_data: RampedModeData,
+    pulse_data: PulseModeData,
+    toggle_data: ToggleModeData,
+    adsr_data: ADSRModeData,
+    cc_data: CCControlModeData,
+    pitchbend_data: PitchBendModeData,
+}
