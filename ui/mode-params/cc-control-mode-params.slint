@@ -43,7 +43,7 @@ export component CCControlModeParams inherits VerticalLayout {
     private property <int> deadband_target: -1;
 
     callback changed();
-    callback request_numeric_input(int, int, int, string, string, [string], string, bool);
+    callback request_numeric_input(int, int, int, string, string, [string], string, int);
     callback assign_cc;
     callback reset_cc;
 
@@ -132,9 +132,9 @@ export component CCControlModeParams inherits VerticalLayout {
         value <=> root.cc_number_value;
         quick_buttons: ["1", "64", "127"];
         field_name: "cc_number";
-        request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
+        request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals) => {
             ignore_cc_number_changes = false;
-            root.request_numeric_input(min, max, val, label, suffix, buttons, field, is_float);
+            root.request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals);
         }
         changed(new_value) => {
             if (root.ignore_cc_number_changes) {
@@ -156,9 +156,9 @@ export component CCControlModeParams inherits VerticalLayout {
         value <=> root.center_value_value;
         quick_buttons: ["0", "64", "127"];
         field_name: "cc_center";
-        request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
+        request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals) => {
             ignore_center_value_changes = false;
-            root.request_numeric_input(min, max, val, label, suffix, buttons, field, is_float);
+            root.request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals);
         }
         changed(new_value) => {
             if (root.ignore_center_value_changes) {
@@ -179,12 +179,12 @@ export component CCControlModeParams inherits VerticalLayout {
         maximum: 1000;
         value <=> root.left_pwm_value;
         suffix: "%";
-        is_float: true;
+        max_decimals: 1;
         quick_buttons: ["0", "500", "1000"];
         field_name: "cc_left_pwm";
-        request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
+        request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals) => {
             ignore_left_pwm_changes = false;
-            root.request_numeric_input(min, max, val, label, suffix, buttons, field, is_float);
+            root.request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals);
         }
         changed(new_value) => {
             if (root.ignore_left_pwm_changes) {
@@ -205,12 +205,12 @@ export component CCControlModeParams inherits VerticalLayout {
         maximum: 1000;
         value <=> root.right_pwm_value;
         suffix: "%";
-        is_float: true;
+        max_decimals: 1;
         quick_buttons: ["0", "500", "1000"];
         field_name: "cc_right_pwm";
-        request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
+        request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals) => {
             ignore_right_pwm_changes = false;
-            root.request_numeric_input(min, max, val, label, suffix, buttons, field, is_float);
+            root.request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals);
         }
         changed(new_value) => {
             if (root.ignore_right_pwm_changes) {
@@ -232,9 +232,9 @@ export component CCControlModeParams inherits VerticalLayout {
         value <=> root.deadband_value;
         quick_buttons: ["0", "5", "10"];
         field_name: "cc_deadband";
-        request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
+        request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals) => {
             ignore_deadband_changes = false;
-            root.request_numeric_input(min, max, val, label, suffix, buttons, field, is_float);
+            root.request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals);
         }
         changed(new_value) => {
             if (root.ignore_deadband_changes) {

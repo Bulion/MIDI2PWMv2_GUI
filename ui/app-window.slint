@@ -117,7 +117,7 @@ export component AppWindow inherits Window {
     private property <string> numeric_input_label: "";
     private property <string> numeric_input_suffix: "";
     private property <[string]> numeric_input_quick_buttons: [];
-    private property <bool> numeric_input_is_float: false;
+    private property <int> numeric_input_max_decimals: 0;
     private property <string> active_field: "";
 
     private property <int> confirmed_value: -1;
@@ -258,7 +258,7 @@ export component AppWindow inherits Window {
                 confirmed_field: root.confirmed_field;
                 is_assigning_cc <=> root.temp_is_assigning_cc;
 
-                request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
+                request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals) => {
                     root.confirmed_value = -1;
                     root.confirmed_field = "";
                     root.active_field = field;
@@ -268,7 +268,7 @@ export component AppWindow inherits Window {
                     root.numeric_input_label = label;
                     root.numeric_input_suffix = suffix;
                     root.numeric_input_quick_buttons = buttons;
-                    root.numeric_input_is_float = is_float;
+                    root.numeric_input_max_decimals = max_decimals;
                     root.show_numeric_input = true;
                 }
 
@@ -333,7 +333,7 @@ export component AppWindow inherits Window {
             label: root.numeric_input_label;
             suffix: root.numeric_input_suffix;
             quick_buttons: root.numeric_input_quick_buttons;
-            is_float: root.numeric_input_is_float;
+            max_decimals: root.numeric_input_max_decimals;
 
             confirmed(new_value) => {
                 root.confirmed_value = new_value;

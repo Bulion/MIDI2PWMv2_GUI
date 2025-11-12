@@ -49,7 +49,7 @@ export component ChannelConfigPopup inherits Rectangle {
     callback reset_cc;
     callback save;
     callback close;
-    callback request_numeric_input(int, int, int, string, string, [string], string, bool);
+    callback request_numeric_input(int, int, int, string, string, [string], string, int);
 
     private property <bool> show_confirm_dialog: false;
 
@@ -155,8 +155,8 @@ export component ChannelConfigPopup inherits Rectangle {
                 confirmed_field: root.confirmed_field;
                 is_assigning_cc <=> root.is_assigning_cc;
 
-                request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
-                    root.request_numeric_input(min, max, val, label, suffix, buttons, field, is_float);
+                request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals) => {
+                    root.request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals);
                 }
 
                 assign_cc => {

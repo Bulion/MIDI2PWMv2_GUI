@@ -8,18 +8,42 @@ export component NumericInputPopup inherits Rectangle {
     in property <string> label: "Value";
     in property <string> suffix: "";
     in property <[string]> quick_buttons: [];
-    in property <bool> is_float: false;
+    in property <int> max_decimals: 0;
 
     callback confirmed(int);
     callback canceled();
 
     private property <string> input_text: "";
     private property <bool> first_digit_entry: true;
-    private property <int> parsed_value: root.is_float ? Math.round(input_text.to-float() * 10.0) : input_text.to-float();
-    private property <bool> is_valid: parsed_value >= min_value && parsed_value <= max_value;
+    private property <float> display_scale: max_decimals > 0 ? Math.pow(10.0, max_decimals) : 1.0;
+    private property <float> parsed_float: input_text.to-float();
+    private property <int> parsed_value: max_decimals > 0 ? Math.round(parsed_float * display_scale) : Math.round(parsed_float);
+    private property <bool> is_valid: parsed_value >= min_value && parsed_value <= max_value && root.is_input_valid();
+    private property <int> decimal_count: root.count_decimals(input_text);
+
+    pure function count_decimals(text: string) -> int {
+        if (text.is-float()) {
+            return 0;
+        }
+        return 0;
+    }
+
+    pure function is_input_valid() -> bool {
+        if (input_text == "" || input_text == "." || input_text == "-") {
+            return false;
+        }
+        if (!input_text.is-float()) {
+            return false;
+        }
+        return true;
+    }
 
     changed current_value => {
-        root.input_text = root.is_float ? (current_value / 10.0) : (current_value + "");
+        if (max_decimals > 0) {
+            root.input_text = (current_value / display_scale);
+        } else {
+            root.input_text = current_value + "";
+        }
         first_digit_entry = true;
     }
 
@@ -364,7 +388,7 @@ export component NumericInputPopup inherits Rectangle {
                             background: AppStyle.bg_input;
                             border-width: AppStyle.border_width_thin;
                             border-color: AppStyle.border_default;
-                            visible: root.is_float;
+                            visible: root.max_decimals > 0;
 
                             Text {
                                 text: ".";
@@ -375,7 +399,7 @@ export component NumericInputPopup inherits Rectangle {
                             }
 
                             TouchArea {
-                                enabled: root.is_float;
+                                enabled: root.max_decimals > 0;
                                 clicked => {
                                     if (root.first_digit_entry) {
                                         root.input_text = "0.";
@@ -419,7 +443,7 @@ export component NumericInputPopup inherits Rectangle {
                         border-color: AppStyle.accent_orange_dark;
 
                         Text {
-                            text: root.is_float ? (button-text.to-float() / 10.0) : button-text;
+                            text: root.max_decimals > 0 ? (button-text.to-float() / root.display_scale) : button-text;
                             font-size: AppStyle.font_size_body;
                             color: AppStyle.text_primary;
                             font-weight: 600;
@@ -429,7 +453,7 @@ export component NumericInputPopup inherits Rectangle {
 
                         TouchArea {
                             clicked => {
-                                root.input_text = root.is_float ? (button-text.to-float() / 10.0) : button-text;
+                                root.input_text = root.max_decimals > 0 ? (button-text.to-float() / root.display_scale) : button-text;
                                 first_digit_entry = false;
                             }
                         }

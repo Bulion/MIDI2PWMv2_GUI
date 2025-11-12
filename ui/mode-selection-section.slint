@@ -37,7 +37,7 @@ export component ModeSelectionSection inherits VerticalLayout {
     in-out property <bool> is_assigning_cc: false;
 
     callback mode_changed;
-    callback request_numeric_input(int, int, int, string, string, [string], string, bool);
+    callback request_numeric_input(int, int, int, string, string, [string], string, int);
     callback assign_cc;
     callback reset_cc;
 
@@ -95,8 +95,8 @@ export component ModeSelectionSection inherits VerticalLayout {
                 confirmed_value: root.confirmed_value;
                 confirmed_field: root.confirmed_field;
                 spacing: 0px;
-                request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
-                    root.request_numeric_input(min, max, val, label, suffix, buttons, field, is_float);
+                request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals) => {
+                    root.request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals);
                 }
                 changed => {
                     root.mode_config.instant_data = self.data;
@@ -108,8 +108,8 @@ export component ModeSelectionSection inherits VerticalLayout {
                 data: root.mode_config.ramped_data;
                 confirmed_value: root.confirmed_value;
                 confirmed_field: root.confirmed_field;
-                request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
-                    root.request_numeric_input(min, max, val, label, suffix, buttons, field, is_float);
+                request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals) => {
+                    root.request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals);
                 }
                 changed => {
                     root.mode_config.ramped_data = self.data;
@@ -121,8 +121,8 @@ export component ModeSelectionSection inherits VerticalLayout {
                 data: root.mode_config.pulse_data;
                 confirmed_value: root.confirmed_value;
                 confirmed_field: root.confirmed_field;
-                request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
-                    root.request_numeric_input(min, max, val, label, suffix, buttons, field, is_float);
+                request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals) => {
+                    root.request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals);
                 }
                 changed => {
                     root.mode_config.pulse_data = self.data;
@@ -134,8 +134,8 @@ export component ModeSelectionSection inherits VerticalLayout {
                 data: root.mode_config.toggle_data;
                 confirmed_value: root.confirmed_value;
                 confirmed_field: root.confirmed_field;
-                request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
-                    root.request_numeric_input(min, max, val, label, suffix, buttons, field, is_float);
+                request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals) => {
+                    root.request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals);
                 }
                 changed => {
                     root.mode_config.toggle_data = self.data;
@@ -147,8 +147,8 @@ export component ModeSelectionSection inherits VerticalLayout {
                 data: root.mode_config.adsr_data;
                 confirmed_value: root.confirmed_value;
                 confirmed_field: root.confirmed_field;
-                request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
-                    root.request_numeric_input(min, max, val, label, suffix, buttons, field, is_float);
+                request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals) => {
+                    root.request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals);
                 }
                 changed => {
                     root.mode_config.adsr_data = self.data;
@@ -161,8 +161,8 @@ export component ModeSelectionSection inherits VerticalLayout {
                 confirmed_value: root.confirmed_value;
                 confirmed_field: root.confirmed_field;
                 is_assigning_cc <=> root.is_assigning_cc;
-                request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
-                    root.request_numeric_input(min, max, val, label, suffix, buttons, field, is_float);
+                request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals) => {
+                    root.request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals);
                 }
                 assign_cc => {
                     root.assign_cc();
@@ -180,8 +180,8 @@ export component ModeSelectionSection inherits VerticalLayout {
                 data: root.mode_config.pitchbend_data;
                 confirmed_value: root.confirmed_value;
                 confirmed_field: root.confirmed_field;
-                request_numeric_input(min, max, val, label, suffix, buttons, field, is_float) => {
-                    root.request_numeric_input(min, max, val, label, suffix, buttons, field, is_float);
+                request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals) => {
+                    root.request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals);
                 }
                 changed => {
                     root.mode_config.pitchbend_data = self.data;
