@@ -67,7 +67,8 @@ export component NumericInputPopup inherits Rectangle {
             if (decimal_digits_entered >= max_decimals) {
                 return true;
             }
-            return compute_scaled_value() * 10 + digit > max_value;
+            return integer_part * Math.round(display_scale) +
+                   (decimal_part * 10 + digit) * Math.round(display_scale / Math.pow(10.0, decimal_digits_entered + 1)) > max_value;
         } else {
             if (max_decimals > 0) {
                 return (integer_part * 10 + digit) * Math.round(display_scale) > max_value;
