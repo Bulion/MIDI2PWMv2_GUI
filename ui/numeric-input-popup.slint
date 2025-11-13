@@ -27,7 +27,7 @@ export component NumericInputPopup inherits Rectangle {
         parsed_value <= max_value;
 
     function update_display() {
-        if (root.integer_part == 0 && root.decimal_part == 0 && root.decimal_digits_entered == 0 && !root.has_decimal_point) {
+        if (root.first_digit_entry && root.integer_part == 0 && root.decimal_part == 0 && root.decimal_digits_entered == 0 && !root.has_decimal_point) {
             root.input_text = "";
         } else if (root.has_decimal_point) {
             if (root.decimal_digits_entered == 0) {
