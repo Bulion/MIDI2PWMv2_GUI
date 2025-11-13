@@ -80,7 +80,6 @@ export component NumericInputPopup inherits Rectangle {
 
     function handle_digit_input(digit_value: int) {
         if (root.first_digit_entry) {
-            // First digit replaces everything - validate only the new digit
             if (max_decimals > 0) {
                 if (digit_value * Math.round(display_scale) > max_value) {
                     return;
@@ -96,7 +95,6 @@ export component NumericInputPopup inherits Rectangle {
             root.has_decimal_point = false;
             first_digit_entry = false;
         } else {
-            // Appending to existing value - validate full value
             if (root.would_digit_exceed_max(digit_value)) {
                 return;
             }
@@ -113,7 +111,6 @@ export component NumericInputPopup inherits Rectangle {
     function handle_decimal_point() {
         if (root.max_decimals > 0) {
             if (root.first_digit_entry) {
-                // First input is decimal point - start with "0."
                 root.integer_part = 0;
                 root.decimal_part = 0;
                 root.decimal_digits_entered = 0;
@@ -121,7 +118,6 @@ export component NumericInputPopup inherits Rectangle {
                 first_digit_entry = false;
                 root.update_display();
             } else if (!root.has_decimal_point) {
-                // Add decimal point to existing integer
                 root.has_decimal_point = true;
                 root.update_display();
             }
