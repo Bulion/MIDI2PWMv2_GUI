@@ -14,91 +14,106 @@ export component NumericInputPopup inherits Rectangle {
     callback confirmed(int);
     callback canceled();
 
-    private property <string> input_text: "";
+    private property <int> integer_part: 0;
+    private property <int> decimal_part: 0;
+    private property <int> decimal_digits_entered: 0;
+    private property <bool> has_decimal_point: false;
+    private property <string> input_text: root.build_display_string();
     private property <bool> first_digit_entry: true;
     private property <float> display_scale: max_decimals > 0 ? Math.pow(10.0, max_decimals) : 1.0;
-    private property <float> parsed_float: input_text.to-float();
-    private property <int> parsed_value: max_decimals > 0 ? Math.round(parsed_float * display_scale) : Math.round(parsed_float);
-    private property <bool> is_valid: parsed_value >= min_value && parsed_value <= max_value && root.is_input_valid();
-    private property <int> decimal_count: root.count_decimals(input_text);
+    private property <int> parsed_value: root.compute_scaled_value();
+    private property <bool> is_valid: parsed_value >= min_value && parsed_value <= max_value && !root.first_digit_entry;
 
-    pure function count_decimals(text: string) -> int {
-        return 0;
-    }
-
-    pure function is_input_valid() -> bool {
-        if (input_text == "" || input_text == "." || input_text == "-") {
-            return false;
-        }
-        if (!input_text.is-float()) {
-            return false;
-        }
-        return true;
-    }
-
-    pure function has_too_many_decimals(text: string) -> bool {
-        if (max_decimals == 0) {
-            return false;
-        }
-
-        if (text == "" || !text.is-float()) {
-            return false;
-        }
-
-        if (max_decimals == 1) {
-            return (text == "0.0" || text == "1.0" || text == "2.0" || text == "3.0" || text == "4.0" ||
-                    text == "5.0" || text == "6.0" || text == "7.0" || text == "8.0" || text == "9.0");
-        }
-
-        return false;
-    }
-
-    pure function would_have_too_many_decimals(new_text: string) -> bool {
-        if (max_decimals == 0) {
-            return false;
-        }
-
-        if (!new_text.is-float()) {
-            return false;
-        }
-
-        if (max_decimals == 1) {
-            return new_text.to-float() != Math.round(new_text.to-float() * 10.0) / 10.0;
-        }
-
-        return false;
-    }
-
-    pure function would_exceed_max(new_text: string) -> bool {
-        if (!new_text.is-float()) {
-            return false;
-        }
-
-        if (max_decimals > 0) {
-            return Math.round(new_text.to-float() * display_scale) > max_value;
-        } else {
-            return Math.round(new_text.to-float()) > max_value;
-        }
-    }
-
-    function handle_digit_input(digit: string) {
+    pure function build_display_string() -> string {
         if (root.first_digit_entry) {
-            if (!root.would_exceed_max(digit)) {
-                root.input_text = digit;
-                first_digit_entry = false;
+            return "";
+        }
+
+        if (root.has_decimal_point) {
+            if (root.decimal_digits_entered == 0) {
+                return root.integer_part + ".";
+            } else if (root.max_decimals == 1) {
+                return root.integer_part + "." + root.decimal_part;
             }
+        }
+
+        return root.integer_part + "";
+    }
+
+    pure function compute_scaled_value() -> int {
+        if (max_decimals > 0) {
+            return integer_part * Math.round(display_scale) + decimal_part * Math.round(display_scale / Math.pow(10.0, decimal_digits_entered));
+        }
+        return integer_part;
+    }
+
+    pure function would_digit_exceed_max(digit: int) -> bool {
+        if (has_decimal_point) {
+            if (decimal_digits_entered >= max_decimals) {
+                return true;
+            }
+            return compute_scaled_value() * 10 + digit > max_value;
         } else {
-            if (!root.would_exceed_max(root.input_text + digit) && !root.would_have_too_many_decimals(root.input_text + digit)) {
-                root.input_text += digit;
+            if (max_decimals > 0) {
+                return (integer_part * 10 + digit) * Math.round(display_scale) > max_value;
+            } else {
+                return integer_part * 10 + digit > max_value;
+            }
+        }
+    }
+
+    function handle_digit_input(digit_value: int) {
+        if (root.would_digit_exceed_max(digit_value)) {
+            return;
+        }
+
+        if (root.first_digit_entry) {
+            root.integer_part = digit_value;
+            root.decimal_part = 0;
+            root.decimal_digits_entered = 0;
+            root.has_decimal_point = false;
+            first_digit_entry = false;
+        } else {
+            if (root.has_decimal_point) {
+                root.decimal_part = root.decimal_part * 10 + digit_value;
+                root.decimal_digits_entered = root.decimal_digits_entered + 1;
+            } else {
+                root.integer_part = root.integer_part * 10 + digit_value;
+            }
+        }
+    }
+
+    function handle_decimal_point() {
+        if (root.max_decimals > 0 && !root.has_decimal_point && !root.first_digit_entry) {
+            root.has_decimal_point = true;
+        }
+    }
+
+    function handle_backspace() {
+        if (root.decimal_digits_entered > 0) {
+            root.decimal_part = Math.floor(root.decimal_part / 10);
+            root.decimal_digits_entered = root.decimal_digits_entered - 1;
+        } else if (root.has_decimal_point) {
+            root.has_decimal_point = false;
+        } else if (root.integer_part > 0) {
+            root.integer_part = Math.floor(root.integer_part / 10);
+            if (root.integer_part == 0) {
+                first_digit_entry = true;
             }
         }
     }
 
     changed current_value => {
         if (max_decimals > 0) {
-            root.input_text = (current_value / display_scale);
+            root.integer_part = Math.floor(current_value / Math.round(display_scale));
+            root.decimal_part = Math.mod(current_value, Math.round(display_scale));
+            root.decimal_digits_entered = max_decimals;
+            root.has_decimal_point = root.decimal_part > 0;
         } else {
-            root.input_text = current_value + "";
+            root.integer_part = current_value;
+            root.decimal_part = 0;
+            root.decimal_digits_entered = 0;
+            root.has_decimal_point = false;
         }
         first_digit_entry = true;
     }
@@ -161,91 +176,61 @@ export component NumericInputPopup inherits Rectangle {
 
                 GridLayout {
                     spacing: AppStyle.spacing_sm;
+
                     Row {
                         CalculatorButton {
                             text: "7";
-                            clicked => {
-                                root.handle_digit_input("7");
-                            }
+                            clicked => { root.handle_digit_input(7); }
                         }
-
                         CalculatorButton {
                             text: "8";
-                            clicked => {
-                                root.handle_digit_input("8");
-                            }
+                            clicked => { root.handle_digit_input(8); }
                         }
-
                         CalculatorButton {
                             text: "9";
-                            clicked => {
-                                root.handle_digit_input("9");
-                            }
+                            clicked => { root.handle_digit_input(9); }
                         }
-
                         CalculatorButton {
-                            col: 3;
-                            colspan: 1;
                             text: "←";
                             button_background: AppStyle.bg_button;
-                            clicked => {
-                                root.input_text = "";
-                            }
+                            clicked => { root.handle_backspace(); }
                         }
                     }
 
                     Row {
                         CalculatorButton {
                             text: "4";
-                            clicked => {
-                                root.handle_digit_input("4");
-                            }
+                            clicked => { root.handle_digit_input(4); }
                         }
-
                         CalculatorButton {
                             text: "5";
-                            clicked => {
-                                root.handle_digit_input("5");
-                            }
+                            clicked => { root.handle_digit_input(5); }
                         }
-
                         CalculatorButton {
                             text: "6";
-                            clicked => {
-                                root.handle_digit_input("6");
-                            }
+                            clicked => { root.handle_digit_input(6); }
                         }
                     }
 
                     Row {
                         CalculatorButton {
                             text: "1";
-                            clicked => {
-                                root.handle_digit_input("1");
-                            }
+                            clicked => { root.handle_digit_input(1); }
                         }
-
                         CalculatorButton {
                             text: "2";
-                            clicked => {
-                                root.handle_digit_input("2");
-                            }
+                            clicked => { root.handle_digit_input(2); }
                         }
-
                         CalculatorButton {
                             text: "3";
-                            clicked => {
-                                root.handle_digit_input("3");
-                            }
+                            clicked => { root.handle_digit_input(3); }
                         }
                     }
 
                     Row {
                         CalculatorButton {
                             text: "0";
-                            clicked => {
-                                root.handle_digit_input("0");
-                            }
+                            clicked => { root.handle_digit_input(0); }
                         }
 
                         CalculatorButton {
@@ -253,21 +238,25 @@ export component NumericInputPopup inherits Rectangle {
                             text: ".";
                             clicked => {
                                 if (root.first_digit_entry) {
-                                    root.input_text = "0.";
+                                    root.integer_part = 0;
+                                    root.has_decimal_point = true;
                                     first_digit_entry = false;
                                 } else {
-                                    root.input_text += ".";
+                                    root.handle_decimal_point();
                                 }
                             }
                         }
 
                         CalculatorButton {
-                            col: 2;
                             text: "C";
                             text_color: AppStyle.status_error;
                             button_background: AppStyle.bg_button;
                             clicked => {
-                                root.input_text = "";
+                                root.integer_part = 0;
+                                root.decimal_part = 0;
+                                root.decimal_digits_entered = 0;
+                                root.has_decimal_point = false;
+                                first_digit_entry = true;
                             }
                         }
                     }
