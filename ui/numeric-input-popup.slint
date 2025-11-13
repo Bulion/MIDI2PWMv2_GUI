@@ -39,6 +39,38 @@ export component NumericInputPopup inherits Rectangle {
         return true;
     }
 
+    pure function can_append(char: string) -> bool {
+        if (first_digit_entry) {
+            return true;
+        }
+
+        if (char == ".") {
+            return max_decimals > 0;
+        }
+
+        if (input_text == "" || input_text == "0") {
+            return true;
+        }
+
+        if (!input_text.is-float()) {
+            return true;
+        }
+
+        return true;
+    }
+
+    pure function would_exceed_max(new_text: string) -> bool {
+        if (!new_text.is-float()) {
+            return false;
+        }
+
+        if (max_decimals > 0) {
+            return Math.round(new_text.to-float() * display_scale) > max_value;
+        } else {
+            return Math.round(new_text.to-float()) > max_value;
+        }
+    }
+
     changed current_value => {
         if (max_decimals > 0) {
             root.input_text = (current_value / display_scale);
@@ -111,10 +143,14 @@ export component NumericInputPopup inherits Rectangle {
                             text: "7";
                             clicked => {
                                 if (root.first_digit_entry) {
-                                    root.input_text = "7";
-                                    first_digit_entry = false;
+                                    if (!root.would_exceed_max("7")) {
+                                        root.input_text = "7";
+                                        first_digit_entry = false;
+                                    }
                                 } else {
-                                    root.input_text += "7";
+                                    if (!root.would_exceed_max(root.input_text + "7")) {
+                                        root.input_text += "7";
+                                    }
                                 }
                             }
                         }
@@ -123,10 +159,14 @@ export component NumericInputPopup inherits Rectangle {
                             text: "8";
                             clicked => {
                                 if (root.first_digit_entry) {
-                                    root.input_text = "8";
-                                    first_digit_entry = false;
+                                    if (!root.would_exceed_max("8")) {
+                                        root.input_text = "8";
+                                        first_digit_entry = false;
+                                    }
                                 } else {
-                                    root.input_text += "8";
+                                    if (!root.would_exceed_max(root.input_text + "8")) {
+                                        root.input_text += "8";
+                                    }
                                 }
                             }
                         }
@@ -135,10 +175,14 @@ export component NumericInputPopup inherits Rectangle {
                             text: "9";
                             clicked => {
                                 if (root.first_digit_entry) {
-                                    root.input_text = "9";
-                                    first_digit_entry = false;
+                                    if (!root.would_exceed_max("9")) {
+                                        root.input_text = "9";
+                                        first_digit_entry = false;
+                                    }
                                 } else {
-                                    root.input_text += "9";
+                                    if (!root.would_exceed_max(root.input_text + "9")) {
+                                        root.input_text += "9";
+                                    }
                                 }
                             }
                         }
@@ -159,10 +203,14 @@ export component NumericInputPopup inherits Rectangle {
                             text: "4";
                             clicked => {
                                 if (root.first_digit_entry) {
-                                    root.input_text = "4";
-                                    first_digit_entry = false;
+                                    if (!root.would_exceed_max("4")) {
+                                        root.input_text = "4";
+                                        first_digit_entry = false;
+                                    }
                                 } else {
-                                    root.input_text += "4";
+                                    if (!root.would_exceed_max(root.input_text + "4")) {
+                                        root.input_text += "4";
+                                    }
                                 }
                             }
                         }
@@ -171,10 +219,14 @@ export component NumericInputPopup inherits Rectangle {
                             text: "5";
                             clicked => {
                                 if (root.first_digit_entry) {
-                                    root.input_text = "5";
-                                    first_digit_entry = false;
+                                    if (!root.would_exceed_max("5")) {
+                                        root.input_text = "5";
+                                        first_digit_entry = false;
+                                    }
                                 } else {
-                                    root.input_text += "5";
+                                    if (!root.would_exceed_max(root.input_text + "5")) {
+                                        root.input_text += "5";
+                                    }
                                 }
                             }
                         }
@@ -183,10 +235,14 @@ export component NumericInputPopup inherits Rectangle {
                             text: "6";
                             clicked => {
                                 if (root.first_digit_entry) {
-                                    root.input_text = "6";
-                                    first_digit_entry = false;
+                                    if (!root.would_exceed_max("6")) {
+                                        root.input_text = "6";
+                                        first_digit_entry = false;
+                                    }
                                 } else {
-                                    root.input_text += "6";
+                                    if (!root.would_exceed_max(root.input_text + "6")) {
+                                        root.input_text += "6";
+                                    }
                                 }
                             }
                         }
@@ -197,10 +253,14 @@ export component NumericInputPopup inherits Rectangle {
                             text: "1";
                             clicked => {
                                 if (root.first_digit_entry) {
-                                    root.input_text = "1";
-                                    first_digit_entry = false;
+                                    if (!root.would_exceed_max("1")) {
+                                        root.input_text = "1";
+                                        first_digit_entry = false;
+                                    }
                                 } else {
-                                    root.input_text += "1";
+                                    if (!root.would_exceed_max(root.input_text + "1")) {
+                                        root.input_text += "1";
+                                    }
                                 }
                             }
                         }
@@ -209,10 +269,14 @@ export component NumericInputPopup inherits Rectangle {
                             text: "2";
                             clicked => {
                                 if (root.first_digit_entry) {
-                                    root.input_text = "2";
-                                    first_digit_entry = false;
+                                    if (!root.would_exceed_max("2")) {
+                                        root.input_text = "2";
+                                        first_digit_entry = false;
+                                    }
                                 } else {
-                                    root.input_text += "2";
+                                    if (!root.would_exceed_max(root.input_text + "2")) {
+                                        root.input_text += "2";
+                                    }
                                 }
                             }
                         }
@@ -221,10 +285,14 @@ export component NumericInputPopup inherits Rectangle {
                             text: "3";
                             clicked => {
                                 if (root.first_digit_entry) {
-                                    root.input_text = "3";
-                                    first_digit_entry = false;
+                                    if (!root.would_exceed_max("3")) {
+                                        root.input_text = "3";
+                                        first_digit_entry = false;
+                                    }
                                 } else {
-                                    root.input_text += "3";
+                                    if (!root.would_exceed_max(root.input_text + "3")) {
+                                        root.input_text += "3";
+                                    }
                                 }
                             }
                         }
@@ -235,10 +303,14 @@ export component NumericInputPopup inherits Rectangle {
                             text: "0";
                             clicked => {
                                 if (root.first_digit_entry) {
-                                    root.input_text = "0";
-                                    first_digit_entry = false;
+                                    if (!root.would_exceed_max("0")) {
+                                        root.input_text = "0";
+                                        first_digit_entry = false;
+                                    }
                                 } else {
-                                    root.input_text += "0";
+                                    if (!root.would_exceed_max(root.input_text + "0")) {
+                                        root.input_text += "0";
+                                    }
                                 }
                             }
                         }
