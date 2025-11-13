@@ -31,11 +31,26 @@ export component NumericInputPopup inherits Rectangle {
             if (root.decimal_digits_entered == 0) {
                 root.input_text = root.integer_part + ".";
             } else {
-                root.input_text = root.integer_part + "." + root.decimal_part;
+                root.input_text = root.integer_part + "." + root.format_decimal_part();
             }
         } else {
             root.input_text = root.integer_part + "";
         }
+    }
+
+    function format_decimal_part() -> string {
+        if (root.max_decimals == 1) {
+            return root.decimal_part + "";
+        } else if (root.max_decimals == 2) {
+            if (root.decimal_digits_entered == 1) {
+                return root.decimal_part + "";
+            } else if (root.decimal_part < 10) {
+                return "0" + root.decimal_part;
+            } else {
+                return root.decimal_part + "";
+            }
+        }
+        return root.decimal_part + "";
     }
 
     pure function compute_scaled_value() -> int {
@@ -269,13 +284,17 @@ export component NumericInputPopup inherits Rectangle {
                 if root.quick_buttons.length > 0: HorizontalLayout {
                     spacing: AppStyle.spacing_sm;
 
-                    for button-text[index] in root.quick_buttons: Rectangle {
+                    for button-value-str[index] in root.quick_buttons: Rectangle {
+                        property <int> button-value: button-value-str.to-float();
+
                         background: AppStyle.accent_orange;
                         border-width: AppStyle.border_width_thin;
                         border-color: AppStyle.accent_orange_dark;
 
                         Text {
-                            text: root.max_decimals > 0 ? (button-text.to-float() / root.display_scale) : button-text;
+                            text: root.max_decimals > 0 ?
+                                (Math.floor(button-value / Math.round(root.display_scale)) + "." + Math.mod(button-value, Math.round(root.display_scale))) :
+                                button-value + "";
                             font-size: AppStyle.font_size_body;
                             color: AppStyle.text_primary;
                             font-weight: 600;
@@ -285,8 +304,19 @@ export component NumericInputPopup inherits Rectangle {
 
                         TouchArea {
                             clicked => {
-                                root.input_text = root.max_decimals > 0 ? (button-text.to-float() / root.display_scale) : button-text;
+                                if (root.max_decimals > 0) {
+                                    root.integer_part = Math.floor(button-value / Math.round(root.display_scale));
+                                    root.decimal_part = Math.mod(button-value, Math.round(root.display_scale));
+                                    root.decimal_digits_entered = root.max_decimals;
+                                    root.has_decimal_point = true;
+                                } else {
+                                    root.integer_part = button-value;
+                                    root.decimal_part = 0;
+                                    root.decimal_digits_entered = 0;
+                                    root.has_decimal_point = false;
+                                }
                                 first_digit_entry = false;
+                                root.update_display();
                             }
                         }
                     }
