@@ -28,7 +28,7 @@ export component ToggleModeParams inherits VerticalLayout {
     private property <int> debounce_target: -1;
 
     callback changed();
-    callback request_numeric_input(int, int, int, string, string, [string], string, int);
+    callback request_numeric_input(int, int, int, string, string, [float], string, int);
 
     changed confirmed_field => {
         if (root.confirmed_value >= 0) {
@@ -57,7 +57,7 @@ export component ToggleModeParams inherits VerticalLayout {
         value <=> root.on_level_value;
         suffix: "%";
         max_decimals: 1;
-        quick_buttons: ["0", "500", "1000"];
+        quick_buttons: [0, 500, 1000];
         field_name: "toggle_on_level";
         request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals) => {
             ignore_on_level_changes = false;
@@ -91,7 +91,7 @@ export component ToggleModeParams inherits VerticalLayout {
         maximum: 500;
         value <=> root.debounce_value;
         suffix: "ms";
-        quick_buttons: ["0", "50", "100"];
+        quick_buttons: [0, 50, 100];
         field_name: "toggle_debounce";
         request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals) => {
             ignore_debounce_changes = false;

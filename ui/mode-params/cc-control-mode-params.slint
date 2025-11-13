@@ -43,7 +43,7 @@ export component CCControlModeParams inherits VerticalLayout {
     private property <int> deadband_target: -1;
 
     callback changed();
-    callback request_numeric_input(int, int, int, string, string, [string], string, int);
+    callback request_numeric_input(int, int, int, string, string, [float], string, int);
     callback assign_cc;
     callback reset_cc;
 
@@ -130,7 +130,7 @@ export component CCControlModeParams inherits VerticalLayout {
         minimum: 0;
         maximum: 127;
         value <=> root.cc_number_value;
-        quick_buttons: ["1", "64", "127"];
+        quick_buttons: [1, 64, 127];
         field_name: "cc_number";
         request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals) => {
             ignore_cc_number_changes = false;
@@ -154,7 +154,7 @@ export component CCControlModeParams inherits VerticalLayout {
         minimum: 0;
         maximum: 127;
         value <=> root.center_value_value;
-        quick_buttons: ["0", "64", "127"];
+        quick_buttons: [0, 64, 127];
         field_name: "cc_center";
         request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals) => {
             ignore_center_value_changes = false;
@@ -180,7 +180,7 @@ export component CCControlModeParams inherits VerticalLayout {
         value <=> root.left_pwm_value;
         suffix: "%";
         max_decimals: 1;
-        quick_buttons: ["0", "500", "1000"];
+        quick_buttons: [0, 500, 1000];
         field_name: "cc_left_pwm";
         request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals) => {
             ignore_left_pwm_changes = false;
@@ -206,7 +206,7 @@ export component CCControlModeParams inherits VerticalLayout {
         value <=> root.right_pwm_value;
         suffix: "%";
         max_decimals: 1;
-        quick_buttons: ["0", "500", "1000"];
+        quick_buttons: [0, 500, 1000];
         field_name: "cc_right_pwm";
         request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals) => {
             ignore_right_pwm_changes = false;
@@ -230,7 +230,7 @@ export component CCControlModeParams inherits VerticalLayout {
         minimum: 0;
         maximum: 20;
         value <=> root.deadband_value;
-        quick_buttons: ["0", "5", "10"];
+        quick_buttons: [0, 5, 10];
         field_name: "cc_deadband";
         request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals) => {
             ignore_deadband_changes = false;

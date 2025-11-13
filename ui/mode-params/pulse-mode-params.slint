@@ -38,7 +38,7 @@ export component PulseModeParams inherits VerticalLayout {
     private property <int> release_target: -1;
 
     callback changed();
-    callback request_numeric_input(int, int, int, string, string, [string], string, int);
+    callback request_numeric_input(int, int, int, string, string, [float], string, int);
 
     changed confirmed_field => {
         if (root.confirmed_value >= 0) {
@@ -79,7 +79,7 @@ export component PulseModeParams inherits VerticalLayout {
         value <=> root.on_level_value;
         suffix: "%";
         max_decimals: 1;
-        quick_buttons: ["0", "500", "1000"];
+        quick_buttons: [0, 500, 1000];
         field_name: "pulse_on_level";
         request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals) => {
             ignore_on_level_changes = false;
@@ -113,7 +113,7 @@ export component PulseModeParams inherits VerticalLayout {
         maximum: 1000;
         value <=> root.attack_time_value;
         suffix: "ms";
-        quick_buttons: ["0", "500", "1000"];
+        quick_buttons: [0, 500, 1000];
         field_name: "pulse_attack";
         request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals) => {
             ignore_attack_changes = false;
@@ -138,7 +138,7 @@ export component PulseModeParams inherits VerticalLayout {
         maximum: 1000;
         value <=> root.hold_time_value;
         suffix: "ms";
-        quick_buttons: ["0", "500", "1000"];
+        quick_buttons: [0, 500, 1000];
         field_name: "pulse_hold";
         request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals) => {
             ignore_hold_changes = false;
@@ -163,7 +163,7 @@ export component PulseModeParams inherits VerticalLayout {
         maximum: 1000;
         value <=> root.release_time_value;
         suffix: "ms";
-        quick_buttons: ["0", "500", "1000"];
+        quick_buttons: [0, 500, 1000];
         field_name: "pulse_release";
         request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals) => {
             ignore_release_changes = false;

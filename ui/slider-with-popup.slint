@@ -7,12 +7,12 @@ export component SliderWithPopup inherits Rectangle {
     in-out property <int> value: 0;
     in property <string> label: "";
     in property <string> suffix: "";
-    in property <[string]> quick_buttons: [];
+    in property <[float]> quick_buttons: [];
     in property <string> field_name: "";
     in property <int> max_decimals: 0;
 
     callback changed(int);
-    callback request_numeric_input(int, int, int, string, string, [string], string, int);
+    callback request_numeric_input(int, int, int, string, string, [float], string, int);
     callback value_updated_externally(int);
 
     background: transparent;
