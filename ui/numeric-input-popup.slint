@@ -23,9 +23,6 @@ export component NumericInputPopup inherits Rectangle {
     private property <int> decimal_count: root.count_decimals(input_text);
 
     pure function count_decimals(text: string) -> int {
-        if (text.is-float()) {
-            return 0;
-        }
         return 0;
     }
 
@@ -39,24 +36,37 @@ export component NumericInputPopup inherits Rectangle {
         return true;
     }
 
-    pure function can_append(char: string) -> bool {
-        if (first_digit_entry) {
-            return true;
+    pure function has_too_many_decimals(text: string) -> bool {
+        if (max_decimals == 0) {
+            return false;
         }
 
-        if (char == ".") {
-            return max_decimals > 0;
+        if (text == "" || !text.is-float()) {
+            return false;
         }
 
-        if (input_text == "" || input_text == "0") {
-            return true;
+        if (max_decimals == 1) {
+            return (text == "0.0" || text == "1.0" || text == "2.0" || text == "3.0" || text == "4.0" ||
+                    text == "5.0" || text == "6.0" || text == "7.0" || text == "8.0" || text == "9.0");
         }
 
-        if (!input_text.is-float()) {
-            return true;
+        return false;
+    }
+
+    pure function would_have_too_many_decimals(new_text: string) -> bool {
+        if (max_decimals == 0) {
+            return false;
         }
 
-        return true;
+        if (!new_text.is-float()) {
+            return false;
+        }
+
+        if (max_decimals == 1) {
+            return new_text.to-float() != Math.round(new_text.to-float() * 10.0) / 10.0;
+        }
+
+        return false;
     }
 
     pure function would_exceed_max(new_text: string) -> bool {
@@ -68,6 +78,19 @@ export component NumericInputPopup inherits Rectangle {
             return Math.round(new_text.to-float() * display_scale) > max_value;
         } else {
             return Math.round(new_text.to-float()) > max_value;
+        }
+    }
+
+    function handle_digit_input(digit: string) {
+        if (root.first_digit_entry) {
+            if (!root.would_exceed_max(digit)) {
+                root.input_text = digit;
+                first_digit_entry = false;
+            }
+        } else {
+            if (!root.would_exceed_max(root.input_text + digit) && !root.would_have_too_many_decimals(root.input_text + digit)) {
+                root.input_text += digit;
+            }
         }
     }
 
@@ -142,48 +165,21 @@ export component NumericInputPopup inherits Rectangle {
                         CalculatorButton {
                             text: "7";
                             clicked => {
-                                if (root.first_digit_entry) {
-                                    if (!root.would_exceed_max("7")) {
-                                        root.input_text = "7";
-                                        first_digit_entry = false;
-                                    }
-                                } else {
-                                    if (!root.would_exceed_max(root.input_text + "7")) {
-                                        root.input_text += "7";
-                                    }
-                                }
+                                root.handle_digit_input("7");
                             }
                         }
 
                         CalculatorButton {
                             text: "8";
                             clicked => {
-                                if (root.first_digit_entry) {
-                                    if (!root.would_exceed_max("8")) {
-                                        root.input_text = "8";
-                                        first_digit_entry = false;
-                                    }
-                                } else {
-                                    if (!root.would_exceed_max(root.input_text + "8")) {
-                                        root.input_text += "8";
-                                    }
-                                }
+                                root.handle_digit_input("8");
                             }
                         }
 
                         CalculatorButton {
                             text: "9";
                             clicked => {
-                                if (root.first_digit_entry) {
-                                    if (!root.would_exceed_max("9")) {
-                                        root.input_text = "9";
-                                        first_digit_entry = false;
-                                    }
-                                } else {
-                                    if (!root.would_exceed_max(root.input_text + "9")) {
-                                        root.input_text += "9";
-                                    }
-                                }
+                                root.handle_digit_input("9");
                             }
                         }
 
@@ -202,48 +198,21 @@ export component NumericInputPopup inherits Rectangle {
                         CalculatorButton {
                             text: "4";
                             clicked => {
-                                if (root.first_digit_entry) {
-                                    if (!root.would_exceed_max("4")) {
-                                        root.input_text = "4";
-                                        first_digit_entry = false;
-                                    }
-                                } else {
-                                    if (!root.would_exceed_max(root.input_text + "4")) {
-                                        root.input_text += "4";
-                                    }
-                                }
+                                root.handle_digit_input("4");
                             }
                         }
 
                         CalculatorButton {
                             text: "5";
                             clicked => {
-                                if (root.first_digit_entry) {
-                                    if (!root.would_exceed_max("5")) {
-                                        root.input_text = "5";
-                                        first_digit_entry = false;
-                                    }
-                                } else {
-                                    if (!root.would_exceed_max(root.input_text + "5")) {
-                                        root.input_text += "5";
-                                    }
-                                }
+                                root.handle_digit_input("5");
                             }
                         }
 
                         CalculatorButton {
                             text: "6";
                             clicked => {
-                                if (root.first_digit_entry) {
-                                    if (!root.would_exceed_max("6")) {
-                                        root.input_text = "6";
-                                        first_digit_entry = false;
-                                    }
-                                } else {
-                                    if (!root.would_exceed_max(root.input_text + "6")) {
-                                        root.input_text += "6";
-                                    }
-                                }
+                                root.handle_digit_input("6");
                             }
                         }
                     }
@@ -252,48 +221,21 @@ export component NumericInputPopup inherits Rectangle {
                         CalculatorButton {
                             text: "1";
                             clicked => {
-                                if (root.first_digit_entry) {
-                                    if (!root.would_exceed_max("1")) {
-                                        root.input_text = "1";
-                                        first_digit_entry = false;
-                                    }
-                                } else {
-                                    if (!root.would_exceed_max(root.input_text + "1")) {
-                                        root.input_text += "1";
-                                    }
-                                }
+                                root.handle_digit_input("1");
                             }
                         }
 
                         CalculatorButton {
                             text: "2";
                             clicked => {
-                                if (root.first_digit_entry) {
-                                    if (!root.would_exceed_max("2")) {
-                                        root.input_text = "2";
-                                        first_digit_entry = false;
-                                    }
-                                } else {
-                                    if (!root.would_exceed_max(root.input_text + "2")) {
-                                        root.input_text += "2";
-                                    }
-                                }
+                                root.handle_digit_input("2");
                             }
                         }
 
                         CalculatorButton {
                             text: "3";
                             clicked => {
-                                if (root.first_digit_entry) {
-                                    if (!root.would_exceed_max("3")) {
-                                        root.input_text = "3";
-                                        first_digit_entry = false;
-                                    }
-                                } else {
-                                    if (!root.would_exceed_max(root.input_text + "3")) {
-                                        root.input_text += "3";
-                                    }
-                                }
+                                root.handle_digit_input("3");
                             }
                         }
                     }
@@ -302,16 +244,7 @@ export component NumericInputPopup inherits Rectangle {
                         CalculatorButton {
                             text: "0";
                             clicked => {
-                                if (root.first_digit_entry) {
-                                    if (!root.would_exceed_max("0")) {
-                                        root.input_text = "0";
-                                        first_digit_entry = false;
-                                    }
-                                } else {
-                                    if (!root.would_exceed_max(root.input_text + "0")) {
-                                        root.input_text += "0";
-                                    }
-                                }
+                                root.handle_digit_input("0");
                             }
                         }
 
