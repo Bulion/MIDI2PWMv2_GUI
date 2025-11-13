@@ -49,7 +49,9 @@ export component SliderWithPopup inherits Rectangle {
             border-color: AppStyle.border_default;
 
             Text {
-                text: root.value;
+                text: root.max_decimals > 0
+                    ? Math.round(root.value * Math.pow(10.0, root.max_decimals)) / Math.pow(10.0, root.max_decimals)
+                    : Math.round(root.value);
                 color: AppStyle.text_primary;
                 font-size: AppStyle.font_size_small;
                 horizontal-alignment: center;

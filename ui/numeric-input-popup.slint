@@ -21,9 +21,7 @@ export component NumericInputPopup inherits Rectangle {
     private property <bool> first_digit_entry: true;
     private property <string> input_text: "";
     private property <float> parsed_float:
-        (has_decimal_point || decimal_digits_entered > 0)
-            ? integer_part + decimal_part / Math.pow(10.0, decimal_digits_entered)
-            : integer_part;
+        integer_part + (decimal_digits_entered > 0 ? decimal_part / Math.pow(10.0, decimal_digits_entered) : 0);
     private property <bool> is_valid:
         parsed_float >= min_value &&
         parsed_float <= max_value;
