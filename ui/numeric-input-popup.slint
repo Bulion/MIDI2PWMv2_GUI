@@ -19,17 +19,24 @@ export component NumericInputPopup inherits Rectangle {
     private property <int> decimal_digits_entered: 0;
     private property <bool> has_decimal_point: false;
     private property <bool> first_digit_entry: true;
+    private property <string> input_text: "";
     private property <float> display_scale: max_decimals > 0 ? Math.pow(10.0, max_decimals) : 1.0;
     private property <int> parsed_value: root.compute_scaled_value();
     private property <bool> is_valid: parsed_value >= min_value && parsed_value <= max_value && !root.first_digit_entry;
 
-    private property <string> input_text:
-        first_digit_entry ? "" :
-        has_decimal_point ? (
-            decimal_digits_entered == 0 ? integer_part + "." :
-            max_decimals == 1 ? integer_part + "." + decimal_part :
-            integer_part + ""
-        ) : integer_part + "";
+    function update_display() {
+        if (root.first_digit_entry) {
+            root.input_text = "";
+        } else if (root.has_decimal_point) {
+            if (root.decimal_digits_entered == 0) {
+                root.input_text = root.integer_part + ".";
+            } else {
+                root.input_text = root.integer_part + "." + root.decimal_part;
+            }
+        } else {
+            root.input_text = root.integer_part + "";
+        }
+    }
 
     pure function compute_scaled_value() -> int {
         if (max_decimals > 0) {
@@ -72,11 +79,13 @@ export component NumericInputPopup inherits Rectangle {
                 root.integer_part = root.integer_part * 10 + digit_value;
             }
         }
+        root.update_display();
     }
 
     function handle_decimal_point() {
         if (root.max_decimals > 0 && !root.has_decimal_point && !root.first_digit_entry) {
             root.has_decimal_point = true;
+            root.update_display();
         }
     }
 
@@ -92,6 +101,7 @@ export component NumericInputPopup inherits Rectangle {
                 first_digit_entry = true;
             }
         }
+        root.update_display();
     }
 
     changed current_value => {
@@ -107,6 +117,7 @@ export component NumericInputPopup inherits Rectangle {
             root.has_decimal_point = false;
         }
         first_digit_entry = true;
+        root.update_display();
     }
 
     width: AppStyle.popup_numeric_width;
@@ -232,6 +243,7 @@ export component NumericInputPopup inherits Rectangle {
                                     root.integer_part = 0;
                                     root.has_decimal_point = true;
                                     first_digit_entry = false;
+                                    root.update_display();
                                 } else {
                                     root.handle_decimal_point();
                                 }
@@ -248,6 +260,7 @@ export component NumericInputPopup inherits Rectangle {
                                 root.decimal_digits_entered = 0;
                                 root.has_decimal_point = false;
                                 first_digit_entry = true;
+                                root.update_display();
                             }
                         }
                     }
