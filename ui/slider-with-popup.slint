@@ -2,18 +2,18 @@ import { Slider } from "std-widgets.slint";
 import { AppStyle } from "style.slint";
 
 export component SliderWithPopup inherits Rectangle {
-    in property <int> minimum: 0;
-    in property <int> maximum: 100;
-    in-out property <int> value: 0;
+    in property <float> minimum: 0;
+    in property <float> maximum: 100;
+    in-out property <float> value: 0;
     in property <string> label: "";
     in property <string> suffix: "";
     in property <[float]> quick_buttons: [];
     in property <string> field_name: "";
     in property <int> max_decimals: 0;
 
-    callback changed(int);
-    callback request_numeric_input(int, int, int, string, string, [float], string, int);
-    callback value_updated_externally(int);
+    callback changed(float);
+    callback request_numeric_input(float, float, float, string, string, [float], string, int);
+    callback value_updated_externally(float);
 
     background: transparent;
 
@@ -37,8 +37,8 @@ export component SliderWithPopup inherits Rectangle {
             maximum: root.maximum;
             value: root.value;
             changed(new_value) => {
-                root.value = Math.round(new_value);
-                root.changed(Math.round(new_value));
+                root.value = new_value;
+                root.changed(new_value);
             }
         }
 
@@ -49,7 +49,7 @@ export component SliderWithPopup inherits Rectangle {
             border-color: AppStyle.border_default;
 
             Text {
-                text: root.max_decimals > 0 ? (Math.round(root.value) / Math.pow(10.0, root.max_decimals)) : root.value;
+                text: root.value;
                 color: AppStyle.text_primary;
                 font-size: AppStyle.font_size_small;
                 horizontal-alignment: center;
@@ -66,8 +66,7 @@ export component SliderWithPopup inherits Rectangle {
                         root.suffix,
                         root.quick_buttons,
                         root.field_name,
-                        root.max_decimals
-                    );
+                        root.max_decimals);
                 }
             }
         }

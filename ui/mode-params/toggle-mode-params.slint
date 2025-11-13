@@ -15,11 +15,11 @@ export component ToggleModeParams inherits VerticalLayout {
         debounce_delay_ms: 50,
     };
 
-    in property <int> confirmed_value: -1;
+    in property <float> confirmed_value: -1;
     in property <string> confirmed_field: "";
 
-    in-out property <int> on_level_value: Math.round(root.data.on_level * 10.0);
-    in-out property <int> debounce_value: root.data.debounce_delay_ms;
+    in-out property <float> on_level_value: root.data.on_level;
+    in-out property <float> debounce_value: root.data.debounce_delay_ms;
 
     private property <bool> ignore_on_level_changes: false;
     private property <bool> ignore_debounce_changes: false;
@@ -28,14 +28,14 @@ export component ToggleModeParams inherits VerticalLayout {
     private property <int> debounce_target: -1;
 
     callback changed();
-    callback request_numeric_input(int, int, int, string, string, [float], string, int);
+    callback request_numeric_input(float, float, float, string, string, [float], string, int);
 
     changed confirmed_field => {
         if (root.confirmed_value >= 0) {
             if (root.confirmed_field == "toggle_on_level") {
                 ignore_on_level_changes = true;
                 on_level_target = root.confirmed_value;
-                root.data.on_level = root.confirmed_value / 10.0;
+                root.data.on_level = root.confirmed_value;
                 on_level_value = root.confirmed_value;
                 root.changed();
             } else if (root.confirmed_field == "toggle_debounce") {
@@ -70,7 +70,7 @@ export component ToggleModeParams inherits VerticalLayout {
                     on_level_target = -1;
                 }
             } else {
-                root.data.on_level = new_value / 10.0;
+                root.data.on_level = new_value;
                 root.changed();
             }
         }

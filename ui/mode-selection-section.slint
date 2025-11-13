@@ -37,7 +37,7 @@ export component ModeSelectionSection inherits VerticalLayout {
     in-out property <bool> is_assigning_cc: false;
 
     callback mode_changed;
-    callback request_numeric_input(int, int, int, string, string, [float], string, int);
+    callback request_numeric_input(float, float, float, string, string, [float], string, int);
     callback assign_cc;
     callback reset_cc;
 

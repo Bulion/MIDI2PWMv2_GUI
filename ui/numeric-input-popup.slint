@@ -3,15 +3,15 @@ import { AppStyle } from "style.slint";
 import { CalculatorButton } from "components/calculator_button.slint";
 
 export component NumericInputPopup inherits Rectangle {
-    in property <int> min_value: 0;
-    in property <int> max_value: 255;
-    in property <int> current_value: 0;
+    in property <float> min_value: 0;
+    in property <float> max_value: 255;
+    in property <float> current_value: 0;
     in property <string> label: "Value";
     in property <string> suffix: "";
     in property <[float]> quick_buttons: [];
     in property <int> max_decimals: 0;
 
-    callback confirmed(int);
+    callback confirmed(float);
     callback canceled();
 
     private property <int> integer_part: 0;
@@ -20,12 +20,10 @@ export component NumericInputPopup inherits Rectangle {
     private property <bool> has_decimal_point: false;
     private property <bool> first_digit_entry: true;
     private property <string> input_text: "";
-    private property <float> display_scale: max_decimals > 0 ? Math.pow(10.0, max_decimals) : 1.0;
     private property <float> parsed_float:
-        max_decimals > 0 && (has_decimal_point || decimal_digits_entered > 0)
+        (has_decimal_point || decimal_digits_entered > 0)
             ? integer_part + decimal_part / Math.pow(10.0, decimal_digits_entered)
             : integer_part;
-    private property <int> parsed_value: root.compute_scaled_value();
     private property <bool> is_valid:
         parsed_float >= min_value &&
         parsed_float <= max_value;
@@ -57,13 +55,6 @@ export component NumericInputPopup inherits Rectangle {
             }
         }
         return root.decimal_part + "";
-    }
-
-    pure function compute_scaled_value() -> int {
-        if (max_decimals > 0) {
-            return integer_part * Math.round(display_scale) + decimal_part * Math.round(display_scale / Math.pow(10.0, decimal_digits_entered));
-        }
-        return integer_part;
     }
 
     pure function would_digit_exceed_max(digit: int) -> bool {
@@ -134,12 +125,12 @@ export component NumericInputPopup inherits Rectangle {
 
     changed current_value => {
         if (max_decimals > 0) {
-            root.integer_part = Math.floor(current_value / Math.round(display_scale));
-            root.decimal_part = Math.mod(current_value, Math.round(display_scale));
+            root.integer_part = Math.floor(current_value);
+            root.decimal_part = Math.round((current_value - Math.floor(current_value)) * Math.pow(10.0, max_decimals));
             root.decimal_digits_entered = max_decimals;
             root.has_decimal_point = true;
         } else {
-            root.integer_part = current_value;
+            root.integer_part = Math.round(current_value);
             root.decimal_part = 0;
             root.decimal_digits_entered = 0;
             root.has_decimal_point = false;
@@ -291,8 +282,6 @@ export component NumericInputPopup inherits Rectangle {
                     spacing: AppStyle.spacing_sm;
 
                     for button-value[index] in root.quick_buttons: Rectangle {
-                        property <int> scaled-value: Math.round(button-value * Math.round(root.display_scale));
-
                         background: AppStyle.accent_orange;
                         border-width: AppStyle.border_width_thin;
                         border-color: AppStyle.accent_orange_dark;
@@ -309,8 +298,8 @@ export component NumericInputPopup inherits Rectangle {
                         TouchArea {
                             clicked => {
                                 if (root.max_decimals > 0) {
-                                    root.integer_part = Math.floor(scaled-value / Math.round(root.display_scale));
-                                    root.decimal_part = Math.mod(scaled-value, Math.round(root.display_scale));
+                                    root.integer_part = Math.floor(button-value);
+                                    root.decimal_part = Math.round((button-value - Math.floor(button-value)) * Math.pow(10.0, root.max_decimals));
                                     root.decimal_digits_entered = root.max_decimals;
                                     root.has_decimal_point = true;
                                 } else {
@@ -345,7 +334,7 @@ export component NumericInputPopup inherits Rectangle {
                         enabled: root.is_valid;
                         clicked => {
                             if (root.is_valid) {
-                                root.confirmed(root.parsed_value);
+                                root.confirmed(root.parsed_float);
                             }
                         }
                     }

@@ -19,16 +19,16 @@ export component CCControlModeParams inherits VerticalLayout {
         deadband_range: 2,
     };
 
-    in property <int> confirmed_value: -1;
+    in property <float> confirmed_value: -1;
     in property <string> confirmed_field: "";
 
     in-out property <bool> is_assigning_cc: false;
 
-    in-out property <int> cc_number_value: root.data.cc_number;
-    in-out property <int> center_value_value: root.data.center_value;
-    in-out property <int> left_pwm_value: Math.round(root.data.left_max_pwm * 10.0);
-    in-out property <int> right_pwm_value: Math.round(root.data.right_max_pwm * 10.0);
-    in-out property <int> deadband_value: root.data.deadband_range;
+    in-out property <float> cc_number_value: root.data.cc_number;
+    in-out property <float> center_value_value: root.data.center_value;
+    in-out property <float> left_pwm_value: root.data.left_max_pwm;
+    in-out property <float> right_pwm_value: root.data.right_max_pwm;
+    in-out property <float> deadband_value: root.data.deadband_range;
 
     private property <bool> ignore_cc_number_changes: false;
     private property <bool> ignore_center_value_changes: false;
@@ -43,7 +43,7 @@ export component CCControlModeParams inherits VerticalLayout {
     private property <int> deadband_target: -1;
 
     callback changed();
-    callback request_numeric_input(int, int, int, string, string, [float], string, int);
+    callback request_numeric_input(float, float, float, string, string, [float], string, int);
     callback assign_cc;
     callback reset_cc;
 
@@ -64,13 +64,13 @@ export component CCControlModeParams inherits VerticalLayout {
             } else if (root.confirmed_field == "cc_left_pwm") {
                 ignore_left_pwm_changes = true;
                 left_pwm_target = root.confirmed_value;
-                root.data.left_max_pwm = root.confirmed_value / 10.0;
+                root.data.left_max_pwm = root.confirmed_value;
                 left_pwm_value = root.confirmed_value;
                 root.changed();
             } else if (root.confirmed_field == "cc_right_pwm") {
                 ignore_right_pwm_changes = true;
                 right_pwm_target = root.confirmed_value;
-                root.data.right_max_pwm = root.confirmed_value / 10.0;
+                root.data.right_max_pwm = root.confirmed_value;
                 right_pwm_value = root.confirmed_value;
                 root.changed();
             } else if (root.confirmed_field == "cc_deadband") {
@@ -193,7 +193,7 @@ export component CCControlModeParams inherits VerticalLayout {
                     left_pwm_target = -1;
                 }
             } else {
-                root.data.left_max_pwm = new_value / 10.0;
+                root.data.left_max_pwm = new_value;
                 root.changed();
             }
         }
@@ -219,7 +219,7 @@ export component CCControlModeParams inherits VerticalLayout {
                     right_pwm_target = -1;
                 }
             } else {
-                root.data.right_max_pwm = new_value / 10.0;
+                root.data.right_max_pwm = new_value;
                 root.changed();
             }
         }

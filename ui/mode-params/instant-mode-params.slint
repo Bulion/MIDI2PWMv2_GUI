@@ -13,24 +13,23 @@ export component InstantModeParams inherits VerticalLayout {
         velocity_sensitive: true,
     };
 
-    in property <int> confirmed_value: -1;
+    in property <float> confirmed_value: -1;
     in property <string> confirmed_field: "";
 
-    in-out property <int> on_level_value: Math.round(root.data.on_level * 10.0);
-    private property <bool> ignore-slider-changes: false;
-    private property <int> target-value: -1;
+    in-out property <float> on_level_value: root.data.on_level;
 
     callback changed();
-    callback request_numeric_input(int, int, int, string, string, [float], string, int);
+    callback request_numeric_input(float, float, float, string, string, [float], string, int);
 
     changed confirmed_field => {
         if (root.confirmed_field == "instant_on_level" && root.confirmed_value >= 0) {
-            ignore-slider-changes = true;
-            target-value = root.confirmed_value;
-            root.data.on_level = root.confirmed_value / 10.0;
-            on_level_value = root.confirmed_value;
+            root.on_level_value = root.confirmed_value;
             root.changed();
         }
+    }
+
+    changed on_level_value => {
+        root.data.on_level = root.on_level_value;
     }
 
     spacing: AppStyle.spacing_sm;
@@ -45,19 +44,10 @@ export component InstantModeParams inherits VerticalLayout {
         quick_buttons: [0, 50.0, 100.0];
         field_name: "instant_on_level";
         request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals) => {
-            ignore-slider-changes = false;
             root.request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals);
         }
         changed(new_value) => {
-            if (root.ignore-slider-changes) {
-                if (Math.abs(new_value - root.target-value) < 5) {
-                    ignore-slider-changes = false;
-                    target-value = -1;
-                }
-            } else {
-                root.data.on_level = new_value / 10.0;
-                root.changed();
-            }
+            root.changed();
         }
     }
 

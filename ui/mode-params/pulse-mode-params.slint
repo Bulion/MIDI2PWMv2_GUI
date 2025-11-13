@@ -19,13 +19,13 @@ export component PulseModeParams inherits VerticalLayout {
         release_time_ms: 50,
     };
 
-    in property <int> confirmed_value: -1;
+    in property <float> confirmed_value: -1;
     in property <string> confirmed_field: "";
 
-    in-out property <int> on_level_value: Math.round(root.data.on_level * 10.0);
-    in-out property <int> attack_time_value: root.data.attack_time_ms;
-    in-out property <int> hold_time_value: root.data.hold_time_ms;
-    in-out property <int> release_time_value: root.data.release_time_ms;
+    in-out property <float> on_level_value: root.data.on_level;
+    in-out property <float> attack_time_value: root.data.attack_time_ms;
+    in-out property <float> hold_time_value: root.data.hold_time_ms;
+    in-out property <float> release_time_value: root.data.release_time_ms;
 
     private property <bool> ignore_on_level_changes: false;
     private property <bool> ignore_attack_changes: false;
@@ -38,14 +38,14 @@ export component PulseModeParams inherits VerticalLayout {
     private property <int> release_target: -1;
 
     callback changed();
-    callback request_numeric_input(int, int, int, string, string, [float], string, int);
+    callback request_numeric_input(float, float, float, string, string, [float], string, int);
 
     changed confirmed_field => {
         if (root.confirmed_value >= 0) {
             if (root.confirmed_field == "pulse_on_level") {
                 ignore_on_level_changes = true;
                 on_level_target = root.confirmed_value;
-                root.data.on_level = root.confirmed_value / 10.0;
+                root.data.on_level = root.confirmed_value;
                 on_level_value = root.confirmed_value;
                 root.changed();
             } else if (root.confirmed_field == "pulse_attack") {
@@ -92,7 +92,7 @@ export component PulseModeParams inherits VerticalLayout {
                     on_level_target = -1;
                 }
             } else {
-                root.data.on_level = new_value / 10.0;
+                root.data.on_level = new_value;
                 root.changed();
             }
         }
