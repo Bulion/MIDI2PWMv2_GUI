@@ -53,11 +53,11 @@ export component ToggleModeParams inherits VerticalLayout {
     SliderWithPopup {
         label: "On Level";
         minimum: 0;
-        maximum: 1000;
+        maximum: 100.0;
         value <=> root.on_level_value;
         suffix: "%";
         max_decimals: 1;
-        quick_buttons: [0, 500, 1000];
+        quick_buttons: [0, 50.0, 100.0];
         field_name: "toggle_on_level";
         request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals) => {
             ignore_on_level_changes = false;

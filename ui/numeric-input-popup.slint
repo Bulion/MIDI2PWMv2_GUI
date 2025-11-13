@@ -21,10 +21,13 @@ export component NumericInputPopup inherits Rectangle {
     private property <bool> first_digit_entry: true;
     private property <string> input_text: "";
     private property <float> display_scale: max_decimals > 0 ? Math.pow(10.0, max_decimals) : 1.0;
+    private property <int> scaled_min: Math.round(min_value * Math.round(display_scale));
+    private property <int> scaled_max: Math.round(max_value * Math.round(display_scale));
+    private property <int> scaled_current: Math.round(current_value * Math.round(display_scale));
     private property <int> parsed_value: root.compute_scaled_value();
     private property <bool> is_valid:
-        parsed_value >= min_value &&
-        parsed_value <= max_value;
+        parsed_value >= scaled_min &&
+        parsed_value <= scaled_max;
 
     function update_display() {
         if (root.first_digit_entry && root.integer_part == 0 && root.decimal_part == 0 && root.decimal_digits_entered == 0 && !root.has_decimal_point) {
@@ -68,12 +71,12 @@ export component NumericInputPopup inherits Rectangle {
                 return true;
             }
             return integer_part * Math.round(display_scale) +
-                   (decimal_part * 10 + digit) * Math.round(display_scale / Math.pow(10.0, decimal_digits_entered + 1)) > max_value;
+                   (decimal_part * 10 + digit) * Math.round(display_scale / Math.pow(10.0, decimal_digits_entered + 1)) > scaled_max;
         } else {
             if (max_decimals > 0) {
-                return (integer_part * 10 + digit) * Math.round(display_scale) > max_value;
+                return (integer_part * 10 + digit) * Math.round(display_scale) > scaled_max;
             } else {
-                return integer_part * 10 + digit > max_value;
+                return integer_part * 10 + digit > scaled_max;
             }
         }
     }
@@ -81,11 +84,11 @@ export component NumericInputPopup inherits Rectangle {
     function handle_digit_input(digit_value: int) {
         if (root.first_digit_entry) {
             if (max_decimals > 0) {
-                if (digit_value * Math.round(display_scale) > max_value) {
+                if (digit_value * Math.round(display_scale) > scaled_max) {
                     return;
                 }
             } else {
-                if (digit_value > max_value) {
+                if (digit_value > scaled_max) {
                     return;
                 }
             }
@@ -141,12 +144,12 @@ export component NumericInputPopup inherits Rectangle {
 
     changed current_value => {
         if (max_decimals > 0) {
-            root.integer_part = Math.floor(current_value / Math.round(display_scale));
-            root.decimal_part = Math.mod(current_value, Math.round(display_scale));
+            root.integer_part = Math.floor(scaled_current / Math.round(display_scale));
+            root.decimal_part = Math.mod(scaled_current, Math.round(display_scale));
             root.decimal_digits_entered = max_decimals;
             root.has_decimal_point = true;
         } else {
-            root.integer_part = current_value;
+            root.integer_part = scaled_current;
             root.decimal_part = 0;
             root.decimal_digits_entered = 0;
             root.has_decimal_point = false;
