@@ -22,7 +22,9 @@ export component NumericInputPopup inherits Rectangle {
     private property <string> input_text: "";
     private property <float> display_scale: max_decimals > 0 ? Math.pow(10.0, max_decimals) : 1.0;
     private property <int> parsed_value: root.compute_scaled_value();
-    private property <bool> is_valid: parsed_value >= min_value && parsed_value <= max_value && !root.first_digit_entry;
+    private property <bool> is_valid:
+        parsed_value >= min_value &&
+        parsed_value <= max_value;
 
     function update_display() {
         if (root.integer_part == 0 && root.decimal_part == 0 && root.decimal_digits_entered == 0 && !root.has_decimal_point) {
