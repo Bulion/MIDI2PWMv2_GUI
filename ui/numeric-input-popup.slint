@@ -76,17 +76,27 @@ export component NumericInputPopup inherits Rectangle {
     }
 
     function handle_digit_input(digit_value: int) {
-        if (root.would_digit_exceed_max(digit_value)) {
-            return;
-        }
-
         if (root.first_digit_entry) {
+            // First digit replaces everything - validate only the new digit
+            if (max_decimals > 0) {
+                if (digit_value * Math.round(display_scale) > max_value) {
+                    return;
+                }
+            } else {
+                if (digit_value > max_value) {
+                    return;
+                }
+            }
             root.integer_part = digit_value;
             root.decimal_part = 0;
             root.decimal_digits_entered = 0;
             root.has_decimal_point = false;
             first_digit_entry = false;
         } else {
+            // Appending to existing value - validate full value
+            if (root.would_digit_exceed_max(digit_value)) {
+                return;
+            }
             if (root.has_decimal_point) {
                 root.decimal_part = root.decimal_part * 10 + digit_value;
                 root.decimal_digits_entered = root.decimal_digits_entered + 1;
@@ -98,9 +108,20 @@ export component NumericInputPopup inherits Rectangle {
     }
 
     function handle_decimal_point() {
-        if (root.max_decimals > 0 && !root.has_decimal_point && !root.first_digit_entry) {
-            root.has_decimal_point = true;
-            root.update_display();
+        if (root.max_decimals > 0) {
+            if (root.first_digit_entry) {
+                // First input is decimal point - start with "0."
+                root.integer_part = 0;
+                root.decimal_part = 0;
+                root.decimal_digits_entered = 0;
+                root.has_decimal_point = true;
+                first_digit_entry = false;
+                root.update_display();
+            } else if (!root.has_decimal_point) {
+                // Add decimal point to existing integer
+                root.has_decimal_point = true;
+                root.update_display();
+            }
         }
     }
 
@@ -254,16 +275,7 @@ export component NumericInputPopup inherits Rectangle {
                             visible: root.max_decimals > 0;
                             text: ".";
                             clicked => {
-                                if (root.first_digit_entry) {
-                                    root.integer_part = 0;
-                                    root.decimal_part = 0;
-                                    root.decimal_digits_entered = 0;
-                                    root.has_decimal_point = true;
-                                    first_digit_entry = false;
-                                    root.update_display();
-                                } else {
-                                    root.handle_decimal_point();
-                                }
+                                root.handle_decimal_point();
                             }
                         }
 
