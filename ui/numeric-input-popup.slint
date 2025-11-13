@@ -25,7 +25,7 @@ export component NumericInputPopup inherits Rectangle {
     private property <bool> is_valid: parsed_value >= min_value && parsed_value <= max_value && !root.first_digit_entry;
 
     function update_display() {
-        if (root.first_digit_entry) {
+        if (root.integer_part == 0 && root.decimal_part == 0 && root.decimal_digits_entered == 0 && !root.has_decimal_point) {
             root.input_text = "";
         } else if (root.has_decimal_point) {
             if (root.decimal_digits_entered == 0) {
@@ -131,7 +131,7 @@ export component NumericInputPopup inherits Rectangle {
             root.decimal_digits_entered = 0;
             root.has_decimal_point = false;
         }
-        first_digit_entry = false;
+        first_digit_entry = true;
         root.update_display();
     }
 
@@ -256,6 +256,8 @@ export component NumericInputPopup inherits Rectangle {
                             clicked => {
                                 if (root.first_digit_entry) {
                                     root.integer_part = 0;
+                                    root.decimal_part = 0;
+                                    root.decimal_digits_entered = 0;
                                     root.has_decimal_point = true;
                                     first_digit_entry = false;
                                     root.update_display();
