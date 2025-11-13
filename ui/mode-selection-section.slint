@@ -31,7 +31,7 @@ export component ModeSelectionSection inherits VerticalLayout {
         pitchbend_data: { base_level: 128, bend_range: 64, unipolar: false, velocity_sensitive: true },
     };
 
-    in property <int> confirmed_value: -1;
+    in property <float> confirmed_value: -1;
     in property <string> confirmed_field: "";
 
     in-out property <bool> is_assigning_cc: false;
