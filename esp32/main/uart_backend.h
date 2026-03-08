@@ -7,7 +7,6 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <driver/uart.h>
-#include <driver/gpio.h>
 
 namespace gui::esp32
 {
@@ -34,16 +33,14 @@ public:
 
 private:
     static constexpr uart_port_t kUartPort = UART_NUM_0;
-    static constexpr gpio_num_t kTxPin = GPIO_NUM_1;
-    static constexpr gpio_num_t kRxPin = GPIO_NUM_3;
 
     static void FreeRtosTaskEntryPoint(void *taskParameterPointer);
     void uartReaderTaskLoop();
-    bool startFreeRtosReaderTask();
-    void stopFreeRtosReaderTask();
+    bool startReaderTask();
+    void stopReaderTask();
 
+    std::atomic<bool> initialized_{false};
     std::atomic<bool> readerTaskIsRunning_{false};
-    std::atomic<bool> disconnectCallbackPending_{false};
     TaskHandle_t readerTaskHandle_{nullptr};
 
     mutable std::mutex callbackAccessMutex_;
