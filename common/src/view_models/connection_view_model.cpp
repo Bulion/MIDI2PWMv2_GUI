@@ -367,11 +367,33 @@ void ConnectionViewModel::update()
 {
     std::lock_guard<std::mutex> stateLock(viewModelStateMutex_);
 
-    if (!isCurrentlyConnected_ || connectionState_ != ConnectionState::FullyConnected) {
+    if (!isCurrentlyConnected_) {
         return;
     }
 
     uint32_t currentTimeMs = getTimeMs();
+
+    if (connectionState_ == ConnectionState::WaitingForHeartBeatResponse ||
+        connectionState_ == ConnectionState::WaitingForTelemetryData) {
+        uint32_t waitingMs = currentTimeMs - lastTelemetryReceivedMs_;
+        if (waitingMs >= HEARTBEAT_INTERVAL_MS && currentTimeMs - lastHeartBeatSentMs_ >= HEARTBEAT_INTERVAL_MS) {
+            GUI_LOG_INFO("ConnectionVM", "Retrying HeartBeat (state=%d, waited %" PRIu32 " ms)",
+                         static_cast<int>(connectionState_), waitingMs);
+            constexpr bool REQUEST_TELEMETRY = true;
+
+            viewModelStateMutex_.unlock();
+            messageProcessor_.sendHeartBeat(REQUEST_TELEMETRY);
+            viewModelStateMutex_.lock();
+
+            lastHeartBeatSentMs_ = getTimeMs();
+        }
+        return;
+    }
+
+    if (connectionState_ != ConnectionState::FullyConnected) {
+        return;
+    }
+
     uint32_t timeSinceLastTelemetryMs = currentTimeMs - lastTelemetryReceivedMs_;
 
     switch (heartBeatState_) {
