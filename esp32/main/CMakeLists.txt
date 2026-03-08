@@ -5,6 +5,7 @@ idf_component_register(
         "main.cpp"
         "waveshare_rgb_lcd_port.cpp"
         "uart_backend.cpp"
+        "log_forwarder.cpp"
     PRIV_REQUIRES driver
     INCLUDE_DIRS
         "."
