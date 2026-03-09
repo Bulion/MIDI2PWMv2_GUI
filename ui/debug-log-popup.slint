@@ -1,0 +1,71 @@
+import { VerticalBox, HorizontalBox, Button, ScrollView } from "std-widgets.slint";
+import { AppStyle } from "style.slint";
+
+export component DebugLogPopup {
+    in property <[string]> log_lines: [];
+
+    callback close();
+    callback clear_logs();
+
+    width: AppStyle.popup_width_lg;
+    height: AppStyle.popup_height_lg;
+
+    Rectangle {
+        background: AppStyle.bg_secondary;
+        border-color: AppStyle.border_primary;
+        border-width: AppStyle.border_width_md;
+
+        VerticalBox {
+            padding: AppStyle.spacing_lg;
+            spacing: AppStyle.spacing_md;
+
+            Text {
+                text: "Debug Log";
+                font-size: AppStyle.font_size_heading_sm;
+                color: AppStyle.text_primary;
+                horizontal-alignment: center;
+            }
+
+            Rectangle {
+                height: parent.height - 120px;
+                background: AppStyle.bg_primary;
+                border-color: AppStyle.border_secondary;
+                border-width: AppStyle.border_width_sm;
+
+                ScrollView {
+                    VerticalBox {
+                        padding: AppStyle.spacing_sm;
+                        spacing: 2px;
+                        alignment: start;
+
+                        for line[index] in root.log_lines: Text {
+                            text: line;
+                            font-size: AppStyle.font_size_body_sm;
+                            color: AppStyle.text_primary;
+                            wrap: word-wrap;
+                        }
+                    }
+                }
+            }
+
+            HorizontalBox {
+                spacing: AppStyle.spacing_md;
+                alignment: center;
+
+                Button {
+                    text: "Clear";
+                    clicked => {
+                        root.clear_logs();
+                    }
+                }
+
+                Button {
+                    text: "Close";
+                    clicked => {
+                        root.close();
+                    }
+                }
+            }
+        }
+    }
+}
