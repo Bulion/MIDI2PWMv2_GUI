@@ -28,6 +28,8 @@ struct DesktopController
     std::atomic<int> channel_awaiting_note{-1};
     std::atomic<bool> is_assigning_cc{false};
     std::vector<gui::common::PortInfo> cached_ports;
+    std::shared_ptr<slint::VectorModel<ChannelData>> channel_model;
+    slint::SharedString last_midi_message;
 
     void OnMidiMessage(const midi2pwm::midi::ChannelMessageT &message)
     {
@@ -96,9 +98,13 @@ struct DesktopController
         midi_view_model.updateFromChannelMessage(message);
     }
 
-    void OnMessage(const MidiMessageViewModel::MessageString &text) const
+    void OnMessage(const MidiMessageViewModel::MessageString &text)
     {
         slint::SharedString shared{text.c_str()};
+        if (shared == last_midi_message) {
+            return;
+        }
+        last_midi_message = shared;
         slint::invoke_from_event_loop([handle = app, shared]() {
             handle->set_midi_message(shared);
         });
@@ -112,51 +118,63 @@ struct DesktopController
         return std::string(NOTE_NAMES[note_idx]) + std::to_string(octave);
     }
 
-    void OnChannelTelemetry(const ChannelTelemetryViewModel::ChannelsArray &channels) const
+    static ChannelData toSlintChannelData(const gui::common::ChannelData &channelData)
     {
-        slint::invoke_from_event_loop([handle = app, channels]() {
-            auto model = std::make_shared<slint::VectorModel<ChannelData>>();
+        ChannelData slintChannelData;
+        slintChannelData.note = slint::SharedString(channelData.note.c_str());
+        slintChannelData.voltage = channelData.voltage;
+        slintChannelData.current = channelData.currentMa;
+        slintChannelData.duty_cycle = channelData.dutyCyclePercent;
+        slintChannelData.is_active = channelData.isActive;
+        slintChannelData.fault = slint::SharedString(channelData.fault.c_str());
+        slintChannelData.mode_type = channelData.mode_type;
+        slintChannelData.instant_data.on_level = channelData.instant_data.on_level;
+        slintChannelData.instant_data.velocity_sensitive = channelData.instant_data.velocity_sensitive;
+        slintChannelData.ramped_data.on_level = channelData.ramped_data.on_level;
+        slintChannelData.ramped_data.velocity_sensitive = channelData.ramped_data.velocity_sensitive;
+        slintChannelData.ramped_data.attack_time_ms = channelData.ramped_data.attack_time_ms;
+        slintChannelData.ramped_data.release_time_ms = channelData.ramped_data.release_time_ms;
+        slintChannelData.pulse_data.on_level = channelData.pulse_data.on_level;
+        slintChannelData.pulse_data.velocity_sensitive = channelData.pulse_data.velocity_sensitive;
+        slintChannelData.pulse_data.attack_time_ms = channelData.pulse_data.attack_time_ms;
+        slintChannelData.pulse_data.hold_time_ms = channelData.pulse_data.hold_time_ms;
+        slintChannelData.pulse_data.release_time_ms = channelData.pulse_data.release_time_ms;
+        slintChannelData.toggle_data.on_level = channelData.toggle_data.on_level;
+        slintChannelData.toggle_data.velocity_sensitive = channelData.toggle_data.velocity_sensitive;
+        slintChannelData.toggle_data.debounce_delay_ms = channelData.toggle_data.debounce_delay_ms;
+        slintChannelData.adsr_data.attack_level = channelData.adsr_data.attack_level;
+        slintChannelData.adsr_data.sustain_level = channelData.adsr_data.sustain_level;
+        slintChannelData.adsr_data.velocity_sensitive = channelData.adsr_data.velocity_sensitive;
+        slintChannelData.adsr_data.attack_time_ms = channelData.adsr_data.attack_time_ms;
+        slintChannelData.adsr_data.decay_time_ms = channelData.adsr_data.decay_time_ms;
+        slintChannelData.adsr_data.release_time_ms = channelData.adsr_data.release_time_ms;
+        slintChannelData.cc_data.cc_number = channelData.cc_data.cc_number;
+        slintChannelData.cc_data.center_value = channelData.cc_data.center_value;
+        slintChannelData.cc_data.left_max_pwm = channelData.cc_data.left_max_pwm;
+        slintChannelData.cc_data.right_max_pwm = channelData.cc_data.right_max_pwm;
+        slintChannelData.cc_data.deadband_range = channelData.cc_data.deadband_range;
+        slintChannelData.pitchbend_data.base_level = channelData.pitchbend_data.base_level;
+        slintChannelData.pitchbend_data.bend_range = channelData.pitchbend_data.bend_range;
+        slintChannelData.pitchbend_data.unipolar = channelData.pitchbend_data.unipolar;
+        slintChannelData.pitchbend_data.velocity_sensitive = channelData.pitchbend_data.velocity_sensitive;
+        return slintChannelData;
+    }
 
-            for (const auto &channelData : channels) {
-                ChannelData slintChannelData;
-                slintChannelData.note = slint::SharedString(channelData.note.c_str());
-                slintChannelData.voltage = channelData.voltage;
-                slintChannelData.current = channelData.current;
-                slintChannelData.fault = slint::SharedString(channelData.fault.c_str());
-                slintChannelData.mode_type = channelData.mode_type;
-                slintChannelData.instant_data.on_level = channelData.instant_data.on_level;
-                slintChannelData.instant_data.velocity_sensitive = channelData.instant_data.velocity_sensitive;
-                slintChannelData.ramped_data.on_level = channelData.ramped_data.on_level;
-                slintChannelData.ramped_data.velocity_sensitive = channelData.ramped_data.velocity_sensitive;
-                slintChannelData.ramped_data.attack_time_ms = channelData.ramped_data.attack_time_ms;
-                slintChannelData.ramped_data.release_time_ms = channelData.ramped_data.release_time_ms;
-                slintChannelData.pulse_data.on_level = channelData.pulse_data.on_level;
-                slintChannelData.pulse_data.velocity_sensitive = channelData.pulse_data.velocity_sensitive;
-                slintChannelData.pulse_data.attack_time_ms = channelData.pulse_data.attack_time_ms;
-                slintChannelData.pulse_data.hold_time_ms = channelData.pulse_data.hold_time_ms;
-                slintChannelData.pulse_data.release_time_ms = channelData.pulse_data.release_time_ms;
-                slintChannelData.toggle_data.on_level = channelData.toggle_data.on_level;
-                slintChannelData.toggle_data.velocity_sensitive = channelData.toggle_data.velocity_sensitive;
-                slintChannelData.toggle_data.debounce_delay_ms = channelData.toggle_data.debounce_delay_ms;
-                slintChannelData.adsr_data.attack_level = channelData.adsr_data.attack_level;
-                slintChannelData.adsr_data.sustain_level = channelData.adsr_data.sustain_level;
-                slintChannelData.adsr_data.velocity_sensitive = channelData.adsr_data.velocity_sensitive;
-                slintChannelData.adsr_data.attack_time_ms = channelData.adsr_data.attack_time_ms;
-                slintChannelData.adsr_data.decay_time_ms = channelData.adsr_data.decay_time_ms;
-                slintChannelData.adsr_data.release_time_ms = channelData.adsr_data.release_time_ms;
-                slintChannelData.cc_data.cc_number = channelData.cc_data.cc_number;
-                slintChannelData.cc_data.center_value = channelData.cc_data.center_value;
-                slintChannelData.cc_data.left_max_pwm = channelData.cc_data.left_max_pwm;
-                slintChannelData.cc_data.right_max_pwm = channelData.cc_data.right_max_pwm;
-                slintChannelData.cc_data.deadband_range = channelData.cc_data.deadband_range;
-                slintChannelData.pitchbend_data.base_level = channelData.pitchbend_data.base_level;
-                slintChannelData.pitchbend_data.bend_range = channelData.pitchbend_data.bend_range;
-                slintChannelData.pitchbend_data.unipolar = channelData.pitchbend_data.unipolar;
-                slintChannelData.pitchbend_data.velocity_sensitive = channelData.pitchbend_data.velocity_sensitive;
-                model->push_back(slintChannelData);
+    void OnChannelTelemetry(const ChannelTelemetryViewModel::ChannelsArray &channels)
+    {
+        slint::invoke_from_event_loop([this, handle = app, channels]() {
+            if (!channel_model) {
+                channel_model = std::make_shared<slint::VectorModel<ChannelData>>();
+                for (const auto &channelData : channels) {
+                    channel_model->push_back(toSlintChannelData(channelData));
+                }
+                handle->set_channel_model(channel_model);
+                return;
             }
 
-            handle->set_channel_model(model);
+            for (std::size_t i = 0; i < channels.size(); ++i) {
+                channel_model->set_row_data(i, toSlintChannelData(channels[i]));
+            }
         });
     }
 
@@ -182,30 +200,26 @@ struct DesktopController
         });
     }
 
-    void OnConnectionChanged(bool connected) const
+    void OnConnectionChanged(bool peerAlive) const
     {
-        GUI_LOG_INFO("Connection", "Connection state changed: %s", connected ? "CONNECTED" : "DISCONNECTED");
+        GUI_LOG_INFO("Connection", "Connection state changed: %s", peerAlive ? "PEER_ALIVE" : "PEER_LOST");
 
-        slint::invoke_from_event_loop([this, handle = app, connected]() {
-            if (connected) {
-                bool fully_connected = view_model.isFullyConnected();
-                GUI_LOG_DEBUG("Connection", "Connection established, fully_connected=%d", fully_connected);
-
+        slint::invoke_from_event_loop([this, handle = app, peerAlive]() {
+            if (peerAlive) {
                 handle->set_show_connection_screen(false);
-                handle->set_waiting_for_device_data(!fully_connected);
-                handle->set_connection_status("");
-
-                if (fully_connected) {
-                    GUI_LOG_INFO("Connection", "Device fully connected and ready");
-                } else {
-                    GUI_LOG_INFO("Connection", "Waiting for device telemetry data");
-                }
-            } else {
-                GUI_LOG_DEBUG("Connection", "Showing connection screen, refreshing ports");
-                handle->set_show_connection_screen(true);
                 handle->set_waiting_for_device_data(false);
-                handle->set_connection_status("Connection lost. Select a port to reconnect.");
-                view_model.refreshPorts();
+                handle->set_reconnecting_overlay_visible(false);
+                handle->set_connection_status("");
+            } else {
+                if (view_model.isConnected()) {
+                    handle->set_reconnecting_overlay_visible(true);
+                } else {
+                    handle->set_show_connection_screen(true);
+                    handle->set_waiting_for_device_data(false);
+                    handle->set_reconnecting_overlay_visible(false);
+                    handle->set_connection_status("Connection lost. Select a port to reconnect.");
+                    view_model.refreshPorts();
+                }
             }
         });
     }
