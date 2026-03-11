@@ -16,6 +16,9 @@ MessageProcessor::MessageProcessor()
     pwmEndpoint_.OnChannelTelemetry(
         libcomm::PwmEndpoint::ChannelTelemetryHandler::create<MessageProcessor, &MessageProcessor::HandlePwmTelemetry>(*this));
 
+    pwmEndpoint_.OnChannelConfig(
+        libcomm::PwmEndpoint::ChannelConfigHandler::create<MessageProcessor, &MessageProcessor::HandleChannelConfig>(*this));
+
     pwmEndpoint_.OnHeartBeat(
         libcomm::PwmEndpoint::HeartBeatHandler::create<MessageProcessor, &MessageProcessor::HandleHeartBeat>(*this));
 }
@@ -29,6 +32,9 @@ MessageProcessor::MessageProcessor(WriteCallback writeCallback)
 
     pwmEndpoint_.OnChannelTelemetry(
         libcomm::PwmEndpoint::ChannelTelemetryHandler::create<MessageProcessor, &MessageProcessor::HandlePwmTelemetry>(*this));
+
+    pwmEndpoint_.OnChannelConfig(
+        libcomm::PwmEndpoint::ChannelConfigHandler::create<MessageProcessor, &MessageProcessor::HandleChannelConfig>(*this));
 
     pwmEndpoint_.OnHeartBeat(
         libcomm::PwmEndpoint::HeartBeatHandler::create<MessageProcessor, &MessageProcessor::HandleHeartBeat>(*this));
@@ -49,6 +55,11 @@ void MessageProcessor::setPwmTelemetryCallback(PwmTelemetryCallback callback)
     pwmTelemetryCallback_ = callback;
 }
 
+void MessageProcessor::setChannelConfigCallback(ChannelConfigCallback callback)
+{
+    channelConfigCallback_ = callback;
+}
+
 void MessageProcessor::setHeartBeatCallback(HeartBeatCallback callback)
 {
     heartBeatCallback_ = callback;
@@ -66,49 +77,8 @@ bool MessageProcessor::sendChannelConfig(const midi2pwm::pwm::ChannelConfigT &co
 
     flatbuffers::FlatBufferBuilder builder;
 
-    // Pack the mode parameters union
-    flatbuffers::Offset<void> mode_params_offset = 0;
-    midi2pwm::pwm::ModeParametersUnion mode_params_type = midi2pwm::pwm::ModeParametersUnion::NONE;
+    auto channel_config = midi2pwm::pwm::ChannelConfig::Pack(builder, &config);
 
-    if (config.mode_params.type == midi2pwm::pwm::ModeParametersUnion::InstantModeParams) {
-        const auto* instant = config.mode_params.AsInstantModeParams();
-        if (instant) {
-            mode_params_offset = midi2pwm::pwm::CreateInstantModeParams(
-                builder,
-                instant->on_level,
-                instant->velocity_sensitive
-            ).Union();
-            mode_params_type = midi2pwm::pwm::ModeParametersUnion::InstantModeParams;
-        }
-    } else if (config.mode_params.type == midi2pwm::pwm::ModeParametersUnion::RampedModeParams) {
-        const auto* ramped = config.mode_params.AsRampedModeParams();
-        if (ramped) {
-            mode_params_offset = midi2pwm::pwm::CreateRampedModeParams(
-                builder,
-                ramped->on_level,
-                ramped->velocity_sensitive,
-                ramped->attack_time_ms,
-                ramped->release_time_ms
-            ).Union();
-            mode_params_type = midi2pwm::pwm::ModeParametersUnion::RampedModeParams;
-        }
-    }
-
-    // Create the ChannelConfig message with all fields
-    auto channel_config = midi2pwm::pwm::CreateChannelConfig(
-        builder,
-        config.channel_number,
-        config.configuration,
-        config.note,
-        config.midpoint,
-        config.min_point,
-        config.max_point,
-        config.output_mode,
-        mode_params_type,
-        mode_params_offset
-    );
-
-    // Wrap in envelope
     auto envelope = midi2pwm::pwm::CreateEnvelope(
         builder,
         midi2pwm::pwm::Message::ChannelConfig,
@@ -119,8 +89,6 @@ bool MessageProcessor::sendChannelConfig(const midi2pwm::pwm::ChannelConfigT &co
 
     flatbuffers::DetachedBuffer buffer = builder.Release();
 
-    GUI_LOG_DEBUG("MessageProcessor", "Buffer size: %zu bytes", buffer.size());
-
     bool result = pwmEndpoint_.Send(std::move(buffer));
 
     GUI_LOG_INFO("MessageProcessor", "pwmEndpoint_.Send() returned: %d", result);
@@ -128,11 +96,11 @@ bool MessageProcessor::sendChannelConfig(const midi2pwm::pwm::ChannelConfigT &co
     return result;
 }
 
-bool MessageProcessor::sendHeartBeat(bool requestTelemetry)
+bool MessageProcessor::sendHeartBeat(bool requestTelemetry, uint16_t epoch)
 {
-    GUI_LOG_DEBUG("MessageProcessor", "Sending HeartBeat message (request_telemetry=%d)", requestTelemetry);
+    GUI_LOG_DEBUG("MessageProcessor", "Sending HeartBeat message (request_telemetry=%d, epoch=%u)", requestTelemetry, epoch);
 
-    auto buffer = libcomm::BuildHeartBeatMessage(requestTelemetry);
+    auto buffer = libcomm::BuildHeartBeatMessage(requestTelemetry, epoch);
 
     bool result = pwmEndpoint_.Send(std::move(buffer));
 
@@ -183,7 +151,7 @@ void MessageProcessor::handleFrame(const std::uint8_t *frame, std::size_t size)
                 if (packet_type == midi2pwm::midi::Packet::ChannelMessage) {
                     auto channel_msg = midi_envelope->packet_as_ChannelMessage();
                     if (channel_msg) {
-                        GUI_LOG_INFO("MessageProcessor", "Processing MIDI ChannelMessage");
+                        GUI_LOG_DEBUG("MessageProcessor", "Processing MIDI ChannelMessage");
                         HandleMidiChannelMessage(*channel_msg);
                         return;
                     } else {
@@ -218,7 +186,7 @@ void MessageProcessor::handleFrame(const std::uint8_t *frame, std::size_t size)
                 if (message_type == midi2pwm::pwm::Message::ChannelTelemetry) {
                     auto telemetry = pwm_envelope->message_as_ChannelTelemetry();
                     if (telemetry) {
-                        GUI_LOG_INFO("MessageProcessor", "Processing PWM ChannelTelemetry");
+                        GUI_LOG_DEBUG("MessageProcessor", "Processing PWM ChannelTelemetry");
                         HandlePwmTelemetry(*telemetry);
                         return;
                     } else {
@@ -227,11 +195,20 @@ void MessageProcessor::handleFrame(const std::uint8_t *frame, std::size_t size)
                 } else if (message_type == midi2pwm::pwm::Message::HeartBeat) {
                     auto heartbeat = pwm_envelope->message_as_HeartBeat();
                     if (heartbeat) {
-                        GUI_LOG_INFO("MessageProcessor", "Processing PWM HeartBeat");
+                        GUI_LOG_DEBUG("MessageProcessor", "Processing PWM HeartBeat");
                         HandleHeartBeat(*heartbeat);
                         return;
                     } else {
                         GUI_LOG_ERROR("MessageProcessor", "Failed to cast to HeartBeat");
+                    }
+                } else if (message_type == midi2pwm::pwm::Message::ChannelConfig) {
+                    auto config = pwm_envelope->message_as_ChannelConfig();
+                    if (config) {
+                        GUI_LOG_DEBUG("MessageProcessor", "Processing PWM ChannelConfig");
+                        HandleChannelConfig(*config);
+                        return;
+                    } else {
+                        GUI_LOG_ERROR("MessageProcessor", "Failed to cast to ChannelConfig");
                     }
                 } else if (message_type == midi2pwm::pwm::Message::Response) {
                     auto response = pwm_envelope->message_as_Response();
@@ -260,7 +237,7 @@ void MessageProcessor::handleFrame(const std::uint8_t *frame, std::size_t size)
 
 void MessageProcessor::HandleMidiChannelMessage(const midi2pwm::midi::ChannelMessage &message)
 {
-    GUI_LOG_INFO("MessageProcessor", "MIDI ChannelMessage received: channel=%u, type=%u, data1=%u, data2=%u",
+    GUI_LOG_DEBUG("MessageProcessor", "MIDI ChannelMessage received: channel=%u, type=%u, data1=%u, data2=%u",
                  message.channel(), static_cast<unsigned>(message.message_type()),
                  message.data1(), message.data2());
 
@@ -290,9 +267,22 @@ void MessageProcessor::HandlePwmTelemetry(const midi2pwm::pwm::ChannelTelemetry 
     pwmTelemetryCallback_(telemetry);
 }
 
+void MessageProcessor::HandleChannelConfig(const midi2pwm::pwm::ChannelConfig &config)
+{
+    GUI_LOG_DEBUG("MessageProcessor", "ChannelConfig received: channel=%u, mode=%u",
+                  config.channel_number(), static_cast<unsigned>(config.output_mode()));
+
+    if (!channelConfigCallback_.is_valid()) {
+        GUI_LOG_WARNING("MessageProcessor", "ChannelConfig callback not registered");
+        return;
+    }
+
+    channelConfigCallback_(config);
+}
+
 void MessageProcessor::HandleHeartBeat(const midi2pwm::pwm::HeartBeat &heartbeat)
 {
-    GUI_LOG_INFO("MessageProcessor", "HeartBeat received: request_telemetry=%d", heartbeat.request_telemetry());
+    GUI_LOG_DEBUG("MessageProcessor", "HeartBeat received: request_telemetry=%d", heartbeat.request_telemetry());
 
     if (!heartBeatCallback_.is_valid()) {
         GUI_LOG_DEBUG("MessageProcessor", "HeartBeat callback not registered");
