@@ -95,6 +95,12 @@ export component ChannelCard {
         height: parent.height;
 
         Rectangle {
+            width: parent.width;
+            height: parent.height;
+            background: root.is_active ? AppStyle.card_bg_active : transparent;
+        }
+
+        Rectangle {
             OutputsIndicator {
                 y: root.invert ? 0px : root.height - self.height;
             }
