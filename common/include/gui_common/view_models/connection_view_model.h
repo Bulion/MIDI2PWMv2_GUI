@@ -7,6 +7,7 @@
 #include "gui_common/view_models/midi_message_view_model.h"
 #include "libcomm/stream_processor.h"
 
+#include <atomic>
 #include <mutex>
 #include <vector>
 
@@ -16,19 +17,10 @@ namespace gui::common
 class ConnectionViewModel
 {
 public:
-    enum class ConnectionState
+    enum class PeerState
     {
-        Disconnected,
-        WaitingForHeartBeatResponse,
-        WaitingForTelemetryData,
-        FullyConnected
-    };
-
-    enum class HeartBeatState
-    {
-        Idle,
-        Active,
-        WaitingForResponse
+        Unknown,
+        Alive
     };
 
     using PortsChangedCallback = etl::delegate<void(const std::vector<PortInfo> &availablePortsList)>;
@@ -44,7 +36,7 @@ public:
     void disconnect();
 
     bool isConnected() const;
-    bool isFullyConnected() const;
+    bool isPeerAlive() const;
     const std::vector<PortInfo> &ports() const;
 
     void setPortsChangedCallback(PortsChangedCallback portsListChangedCallback);
@@ -55,10 +47,8 @@ public:
     void update();
 
 private:
-    static constexpr std::size_t EXPECTED_CHANNEL_COUNT = 16;
-    static constexpr uint32_t TELEMETRY_IDLE_TIMEOUT_MS = 5000;
-    static constexpr uint32_t HEARTBEAT_INTERVAL_MS = 2000;
-    static constexpr uint32_t HEARTBEAT_RESPONSE_TIMEOUT_MS = 1000;
+    static constexpr uint32_t HEARTBEAT_INTERVAL_MS = 500;
+    static constexpr uint32_t PEER_TIMEOUT_MS = 1500;
 
     bool writeToBackend(const std::uint8_t *data, std::size_t size);
     void handleIncomingParsedFrame(const std::uint8_t *framePayloadData, std::size_t framePayloadSizeBytes);
@@ -66,10 +56,9 @@ private:
     void handleBackendDisconnected();
     void handleMidiChannelMessageReceived(const midi2pwm::midi::ChannelMessageT &midiChannelMessage);
     void handlePwmTelemetryReceived(const midi2pwm::pwm::ChannelTelemetry &telemetry);
+    void handleChannelConfigReceived(const midi2pwm::pwm::ChannelConfig &config);
     void handleHeartBeatReceived(const midi2pwm::pwm::HeartBeat &heartbeat);
     void handleResponseReceived(const midi2pwm::pwm::Response &response);
-    void handleConnectionLost();
-    void sendHeartBeat();
     uint32_t getTimeMs() const;
 
     ConnectionBackend &connectionBackendReference_;
@@ -83,14 +72,16 @@ private:
     RawMidiMessageCallback rawMidiMessageCallback_;
 
     mutable std::mutex viewModelStateMutex_;
+    std::mutex streamProcessorMutex_;
     std::vector<PortInfo> cachedAvailablePorts_;
     bool isCurrentlyConnected_{false};
-    ConnectionState connectionState_{ConnectionState::Disconnected};
-    std::size_t receivedTelemetryChannelCount_{0};
-    HeartBeatState heartBeatState_{HeartBeatState::Idle};
-    uint32_t lastTelemetryReceivedMs_{0};
-    uint32_t lastHeartBeatSentMs_{0};
-    uint32_t heartBeatResponseDeadlineMs_{0};
+    PeerState peerState_{PeerState::Unknown};
+    uint16_t localEpoch_{0};
+    uint16_t peerEpoch_{0};
+    bool peerEpochKnown_{false};
+    uint32_t lastFrameReceivedMs_{0};
+    uint32_t lastHeartbeatSentMs_{0};
+    std::atomic<bool> pendingTelemetryRequest_{false};
 };
 
 } // namespace gui::common

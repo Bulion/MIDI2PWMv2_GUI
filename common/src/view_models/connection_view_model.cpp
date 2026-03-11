@@ -14,6 +14,7 @@ ConnectionViewModel::ConnectionViewModel(ConnectionBackend &connectionBackend,
     , midiMessageViewModelReference_(midiMessageViewModel)
     , channelTelemetryViewModelReference_(channelTelemetryViewModel)
     , messageProcessor_(MessageProcessor::WriteCallback::create<ConnectionViewModel, &ConnectionViewModel::writeToBackend>(*this))
+    , localEpoch_(static_cast<uint16_t>(getTimeMs() & 0xFFFF))
 {
     auto rawDataReceivedCallback = [this](const std::uint8_t *receivedData, std::size_t receivedSizeBytes) {
         handleRawDataFromBackend(receivedData, receivedSizeBytes);
@@ -36,6 +37,10 @@ ConnectionViewModel::ConnectionViewModel(ConnectionBackend &connectionBackend,
     auto pwmTelemetryCallback = MessageProcessor::PwmTelemetryCallback::
         create<ConnectionViewModel, &ConnectionViewModel::handlePwmTelemetryReceived>(*this);
     messageProcessor_.setPwmTelemetryCallback(pwmTelemetryCallback);
+
+    auto channelConfigCallback = MessageProcessor::ChannelConfigCallback::
+        create<ConnectionViewModel, &ConnectionViewModel::handleChannelConfigReceived>(*this);
+    messageProcessor_.setChannelConfigCallback(channelConfigCallback);
 
     auto heartBeatCallback = MessageProcessor::HeartBeatCallback::
         create<ConnectionViewModel, &ConnectionViewModel::handleHeartBeatReceived>(*this);
@@ -60,8 +65,7 @@ std::vector<PortInfo> ConnectionViewModel::refreshPorts()
         cachedAvailablePorts_ = freshlyEnumeratedPorts;
     }
 
-    bool portsChangedCallbackIsRegistered = portsListChangedCallback_.is_valid();
-    if (portsChangedCallbackIsRegistered) {
+    if (portsListChangedCallback_.is_valid()) {
         portsListChangedCallback_(freshlyEnumeratedPorts);
     }
 
@@ -70,10 +74,14 @@ std::vector<PortInfo> ConnectionViewModel::refreshPorts()
 
 bool ConnectionViewModel::connect(const std::string &portIdentifier)
 {
-    bool identifierIsEmpty = portIdentifier.empty();
-    if (identifierIsEmpty) {
+    if (portIdentifier.empty()) {
         GUI_LOG_ERROR("ConnectionVM", "Cannot connect: port identifier is empty");
         return false;
+    }
+
+    {
+        std::lock_guard<std::mutex> streamLock(streamProcessorMutex_);
+        streamProcessor_.reset();
     }
 
     bool backendConnectionSucceeded = connectionBackendReference_.connect(portIdentifier);
@@ -85,25 +93,13 @@ bool ConnectionViewModel::connect(const std::string &portIdentifier)
     {
         std::lock_guard<std::mutex> stateLock(viewModelStateMutex_);
         isCurrentlyConnected_ = true;
-        connectionState_ = ConnectionState::WaitingForHeartBeatResponse;
-        receivedTelemetryChannelCount_ = 0;
-        heartBeatState_ = HeartBeatState::Idle;
-        lastTelemetryReceivedMs_ = getTimeMs();
-        lastHeartBeatSentMs_ = 0;
-        heartBeatResponseDeadlineMs_ = 0;
+        peerState_ = PeerState::Unknown;
+        peerEpochKnown_ = false;
+        lastFrameReceivedMs_ = getTimeMs();
+        lastHeartbeatSentMs_ = getTimeMs();
     }
 
-    GUI_LOG_INFO("ConnectionVM", "Backend connected, sending HeartBeat with forced telemetry request");
-    constexpr bool REQUEST_TELEMETRY = true;
-    bool heartBeatSent = messageProcessor_.sendHeartBeat(REQUEST_TELEMETRY);
-
-    if (!heartBeatSent) {
-        GUI_LOG_ERROR("ConnectionVM", "Failed to send initial HeartBeat - disconnecting");
-        disconnect();
-        return false;
-    }
-
-    GUI_LOG_INFO("ConnectionVM", "Initial HeartBeat sent, waiting for response and telemetry data");
+    GUI_LOG_INFO("ConnectionVM", "Backend connected, epoch=%u", localEpoch_);
     return true;
 }
 
@@ -116,6 +112,12 @@ bool ConnectionViewModel::isConnected() const
 {
     std::lock_guard<std::mutex> stateLock(viewModelStateMutex_);
     return isCurrentlyConnected_;
+}
+
+bool ConnectionViewModel::isPeerAlive() const
+{
+    std::lock_guard<std::mutex> stateLock(viewModelStateMutex_);
+    return peerState_ == PeerState::Alive;
 }
 
 const std::vector<PortInfo> &ConnectionViewModel::ports() const
@@ -133,6 +135,11 @@ void ConnectionViewModel::setConnectionChangedCallback(ConnectionChangedCallback
     connectionStateChangedCallback_ = connectionStateChangedCallback;
 }
 
+void ConnectionViewModel::setRawMidiMessageCallback(RawMidiMessageCallback rawMidiCallback)
+{
+    rawMidiMessageCallback_ = rawMidiCallback;
+}
+
 void ConnectionViewModel::handleIncomingParsedFrame(
     const std::uint8_t *framePayloadData, std::size_t framePayloadSizeBytes)
 {
@@ -142,32 +149,30 @@ void ConnectionViewModel::handleIncomingParsedFrame(
 
 void ConnectionViewModel::handleRawDataFromBackend(const std::uint8_t *receivedData, std::size_t receivedSizeBytes)
 {
+    std::lock_guard<std::mutex> streamLock(streamProcessorMutex_);
     streamProcessor_.feed(receivedData, receivedSizeBytes);
 }
 
 void ConnectionViewModel::handleBackendDisconnected()
 {
     {
+        std::lock_guard<std::mutex> streamLock(streamProcessorMutex_);
+        streamProcessor_.reset();
+    }
+
+    {
         std::lock_guard<std::mutex> stateLock(viewModelStateMutex_);
         isCurrentlyConnected_ = false;
-        connectionState_ = ConnectionState::Disconnected;
-        receivedTelemetryChannelCount_ = 0;
-        streamProcessor_.reset();
+        peerState_ = PeerState::Unknown;
+        peerEpochKnown_ = false;
     }
 
     midiMessageViewModelReference_.clear();
     channelTelemetryViewModelReference_.clear();
 
-    bool connectionStateCallbackIsRegistered = connectionStateChangedCallback_.is_valid();
-    if (connectionStateCallbackIsRegistered) {
-        constexpr bool NOW_DISCONNECTED = false;
-        connectionStateChangedCallback_(NOW_DISCONNECTED);
+    if (connectionStateChangedCallback_.is_valid()) {
+        connectionStateChangedCallback_(false);
     }
-}
-
-void ConnectionViewModel::setRawMidiMessageCallback(RawMidiMessageCallback rawMidiCallback)
-{
-    rawMidiMessageCallback_ = rawMidiCallback;
 }
 
 void ConnectionViewModel::handleMidiChannelMessageReceived(const midi2pwm::midi::ChannelMessageT &midiChannelMessage)
@@ -178,15 +183,25 @@ void ConnectionViewModel::handleMidiChannelMessageReceived(const midi2pwm::midi:
                     midiChannelMessage.data1,
                     midiChannelMessage.data2);
 
-    bool rawCallbackIsRegistered = rawMidiMessageCallback_.is_valid();
-    if (rawCallbackIsRegistered) {
-        GUI_LOG_VERBOSE("ConnectionVM", "Invoking raw MIDI callback");
+    if (rawMidiMessageCallback_.is_valid()) {
         rawMidiMessageCallback_(midiChannelMessage);
-    } else {
-        GUI_LOG_WARNING("ConnectionVM", "Raw MIDI callback not registered - message will not reach assignment logic");
     }
 
     midiMessageViewModelReference_.updateFromChannelMessage(midiChannelMessage);
+
+    bool shouldNotifyConnected = false;
+    {
+        std::lock_guard<std::mutex> stateLock(viewModelStateMutex_);
+        lastFrameReceivedMs_ = getTimeMs();
+        if (peerState_ == PeerState::Unknown) {
+            peerState_ = PeerState::Alive;
+            shouldNotifyConnected = true;
+        }
+    }
+
+    if (shouldNotifyConnected && connectionStateChangedCallback_.is_valid()) {
+        connectionStateChangedCallback_(true);
+    }
 }
 
 void ConnectionViewModel::handlePwmTelemetryReceived(const midi2pwm::pwm::ChannelTelemetry &telemetry)
@@ -195,97 +210,93 @@ void ConnectionViewModel::handlePwmTelemetryReceived(const midi2pwm::pwm::Channe
 
     channelTelemetryViewModelReference_.updateFromTelemetry(telemetry);
 
-    bool shouldCheckConnectionState = false;
+    bool shouldNotifyConnected = false;
     {
         std::lock_guard<std::mutex> stateLock(viewModelStateMutex_);
-
-        lastTelemetryReceivedMs_ = getTimeMs();
-
-        if (heartBeatState_ != HeartBeatState::Idle) {
-            GUI_LOG_INFO("ConnectionVM", "Telemetry received, resetting HeartBeat monitoring to idle");
-            heartBeatState_ = HeartBeatState::Idle;
-        }
-
-        const char *stateNames[] = {"Disconnected", "WaitingForHeartBeatResponse", "WaitingForTelemetryData", "FullyConnected"};
-        GUI_LOG_VERBOSE("ConnectionVM", "Current state: %s", stateNames[static_cast<int>(connectionState_)]);
-
-        if (connectionState_ == ConnectionState::WaitingForTelemetryData) {
-            receivedTelemetryChannelCount_++;
-            GUI_LOG_DEBUG("ConnectionVM", "Received telemetry for channel %u (%zu/%zu)",
-                          telemetry.channel_number(), receivedTelemetryChannelCount_, EXPECTED_CHANNEL_COUNT);
-
-            if (receivedTelemetryChannelCount_ >= EXPECTED_CHANNEL_COUNT) {
-                shouldCheckConnectionState = true;
-            }
-        } else if (connectionState_ == ConnectionState::FullyConnected) {
-            GUI_LOG_VERBOSE("ConnectionVM", "Ongoing telemetry update for channel %u", telemetry.channel_number());
-        } else {
-            GUI_LOG_WARNING("ConnectionVM", "Received telemetry in unexpected state: %s",
-                            stateNames[static_cast<int>(connectionState_)]);
+        lastFrameReceivedMs_ = getTimeMs();
+        if (peerState_ == PeerState::Unknown) {
+            peerState_ = PeerState::Alive;
+            shouldNotifyConnected = true;
         }
     }
 
-    if (shouldCheckConnectionState) {
-        std::lock_guard<std::mutex> stateLock(viewModelStateMutex_);
-        connectionState_ = ConnectionState::FullyConnected;
-        lastTelemetryReceivedMs_ = getTimeMs();
-        GUI_LOG_INFO("ConnectionVM", "All telemetry data received - connection fully established");
+    if (shouldNotifyConnected && connectionStateChangedCallback_.is_valid()) {
+        connectionStateChangedCallback_(true);
+    }
+}
 
-        bool connectionStateCallbackIsRegistered = connectionStateChangedCallback_.is_valid();
-        if (connectionStateCallbackIsRegistered) {
-            constexpr bool NOW_CONNECTED = true;
-            connectionStateChangedCallback_(NOW_CONNECTED);
+void ConnectionViewModel::handleChannelConfigReceived(const midi2pwm::pwm::ChannelConfig &config)
+{
+    GUI_LOG_INFO("ConnectionVM", "ChannelConfig received for channel %u", config.channel_number());
+
+    channelTelemetryViewModelReference_.updateFromConfig(config);
+
+    bool shouldNotifyConnected = false;
+    {
+        std::lock_guard<std::mutex> stateLock(viewModelStateMutex_);
+        lastFrameReceivedMs_ = getTimeMs();
+        if (peerState_ == PeerState::Unknown) {
+            peerState_ = PeerState::Alive;
+            shouldNotifyConnected = true;
         }
+    }
+
+    if (shouldNotifyConnected && connectionStateChangedCallback_.is_valid()) {
+        connectionStateChangedCallback_(true);
     }
 }
 
 void ConnectionViewModel::handleHeartBeatReceived(const midi2pwm::pwm::HeartBeat &heartbeat)
 {
-    GUI_LOG_INFO("ConnectionVM", "HeartBeat response received: request_telemetry=%d", heartbeat.request_telemetry());
+    uint16_t receivedEpoch = heartbeat.epoch();
+    GUI_LOG_DEBUG("ConnectionVM", "HeartBeat received: epoch=%u, request_telemetry=%d",
+                  receivedEpoch, heartbeat.request_telemetry());
 
-    std::lock_guard<std::mutex> stateLock(viewModelStateMutex_);
+    bool shouldNotifyConnected = false;
+    bool shouldClearTelemetry = false;
 
-    if (connectionState_ == ConnectionState::WaitingForHeartBeatResponse) {
-        GUI_LOG_INFO("ConnectionVM", "Initial HeartBeat response received, transitioning to WaitingForTelemetryData state");
-        connectionState_ = ConnectionState::WaitingForTelemetryData;
-        receivedTelemetryChannelCount_ = 0;
-        lastTelemetryReceivedMs_ = getTimeMs();
-    } else if (connectionState_ == ConnectionState::FullyConnected && heartBeatState_ == HeartBeatState::WaitingForResponse) {
-        GUI_LOG_DEBUG("ConnectionVM", "HeartBeat response received, device is alive");
-        heartBeatState_ = HeartBeatState::Active;
+    {
+        std::lock_guard<std::mutex> stateLock(viewModelStateMutex_);
+        lastFrameReceivedMs_ = getTimeMs();
+
+        bool epochChanged = peerEpochKnown_ && (receivedEpoch != peerEpoch_);
+        bool firstContact = !peerEpochKnown_;
+
+        peerEpoch_ = receivedEpoch;
+        peerEpochKnown_ = true;
+
+        if (peerState_ == PeerState::Unknown) {
+            peerState_ = PeerState::Alive;
+            shouldNotifyConnected = true;
+        }
+
+        if (firstContact || epochChanged) {
+            if (epochChanged) {
+                GUI_LOG_INFO("ConnectionVM", "Peer epoch changed %u -> %u, requesting full telemetry resync",
+                             peerEpoch_, receivedEpoch);
+            }
+            pendingTelemetryRequest_.store(true);
+            shouldClearTelemetry = true;
+        }
+    }
+
+    if (shouldClearTelemetry) {
+        channelTelemetryViewModelReference_.clear();
+    }
+
+    if (shouldNotifyConnected && connectionStateChangedCallback_.is_valid()) {
+        connectionStateChangedCallback_(true);
     }
 }
 
 void ConnectionViewModel::handleResponseReceived(const midi2pwm::pwm::Response &response)
 {
     const char *statusString = (response.status() == midi2pwm::pwm::ResponseStatus::ACK) ? "ACK" : "NACK";
-
-    GUI_LOG_INFO("ConnectionVM", "Command Response received: status=%s, error_code=%" PRIu32,
+    GUI_LOG_INFO("ConnectionVM", "Response received: status=%s, error_code=%" PRIu32,
                  statusString, response.error_code());
 
-    if (response.status() == midi2pwm::pwm::ResponseStatus::NACK) {
-        GUI_LOG_ERROR("ConnectionVM", "Device rejected command with error_code=%" PRIu32, response.error_code());
-    }
-
     std::lock_guard<std::mutex> stateLock(viewModelStateMutex_);
-
-    const char *stateNames[] = {"Disconnected", "WaitingForHeartBeatResponse", "WaitingForTelemetryData", "FullyConnected"};
-    GUI_LOG_INFO("ConnectionVM", "Response handler - Current connection state: %s", stateNames[static_cast<int>(connectionState_)]);
-
-    if (connectionState_ == ConnectionState::WaitingForHeartBeatResponse) {
-        GUI_LOG_INFO("ConnectionVM", "Initial HeartBeat acknowledged, transitioning to WaitingForTelemetryData state");
-        connectionState_ = ConnectionState::WaitingForTelemetryData;
-        receivedTelemetryChannelCount_ = 0;
-    } else {
-        GUI_LOG_WARNING("ConnectionVM", "Received Response but not in WaitingForHeartBeatResponse state (current: %s)",
-                        stateNames[static_cast<int>(connectionState_)]);
-    }
-}
-
-bool ConnectionViewModel::isFullyConnected() const
-{
-    std::lock_guard<std::mutex> stateLock(viewModelStateMutex_);
-    return connectionState_ == ConnectionState::FullyConnected;
+    lastFrameReceivedMs_ = getTimeMs();
 }
 
 bool ConnectionViewModel::sendChannelConfig(const midi2pwm::pwm::ChannelConfigT &config)
@@ -306,124 +317,45 @@ uint32_t ConnectionViewModel::getTimeMs() const
     return static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
 }
 
-void ConnectionViewModel::sendHeartBeat()
-{
-    GUI_LOG_DEBUG("ConnectionVM", "Sending HeartBeat");
-    constexpr bool REQUEST_TELEMETRY = false;
-
-    viewModelStateMutex_.unlock();
-    bool sent = messageProcessor_.sendHeartBeat(REQUEST_TELEMETRY);
-    viewModelStateMutex_.lock();
-
-    if (!sent) {
-        GUI_LOG_ERROR("ConnectionVM", "Failed to send HeartBeat - treating as connection lost");
-
-        if (isCurrentlyConnected_) {
-            isCurrentlyConnected_ = false;
-            connectionState_ = ConnectionState::Disconnected;
-            heartBeatState_ = HeartBeatState::Idle;
-
-            viewModelStateMutex_.unlock();
-
-            disconnect();
-
-            bool connectionStateCallbackIsRegistered = connectionStateChangedCallback_.is_valid();
-            if (connectionStateCallbackIsRegistered) {
-                constexpr bool NOW_DISCONNECTED = false;
-                connectionStateChangedCallback_(NOW_DISCONNECTED);
-            }
-
-            viewModelStateMutex_.lock();
-        }
-    }
-}
-
-void ConnectionViewModel::handleConnectionLost()
-{
-    GUI_LOG_ERROR("ConnectionVM", "Connection lost detected");
-
-    if (!isCurrentlyConnected_) {
-        return;
-    }
-
-    isCurrentlyConnected_ = false;
-    connectionState_ = ConnectionState::Disconnected;
-    heartBeatState_ = HeartBeatState::Idle;
-
-    viewModelStateMutex_.unlock();
-
-    disconnect();
-
-    bool connectionStateCallbackIsRegistered = connectionStateChangedCallback_.is_valid();
-    if (connectionStateCallbackIsRegistered) {
-        constexpr bool NOW_DISCONNECTED = false;
-        connectionStateChangedCallback_(NOW_DISCONNECTED);
-    }
-
-    viewModelStateMutex_.lock();
-}
-
 void ConnectionViewModel::update()
 {
-    std::lock_guard<std::mutex> stateLock(viewModelStateMutex_);
+    bool shouldSendHeartbeat = false;
+    bool shouldNotifyDisconnected = false;
 
-    if (!isCurrentlyConnected_) {
-        return;
-    }
+    {
+        std::lock_guard<std::mutex> stateLock(viewModelStateMutex_);
 
-    uint32_t currentTimeMs = getTimeMs();
-
-    if (connectionState_ == ConnectionState::WaitingForHeartBeatResponse ||
-        connectionState_ == ConnectionState::WaitingForTelemetryData) {
-        uint32_t waitingMs = currentTimeMs - lastTelemetryReceivedMs_;
-        if (waitingMs >= HEARTBEAT_INTERVAL_MS && currentTimeMs - lastHeartBeatSentMs_ >= HEARTBEAT_INTERVAL_MS) {
-            GUI_LOG_INFO("ConnectionVM", "Retrying HeartBeat (state=%d, waited %" PRIu32 " ms)",
-                         static_cast<int>(connectionState_), waitingMs);
-            constexpr bool REQUEST_TELEMETRY = true;
-
-            viewModelStateMutex_.unlock();
-            messageProcessor_.sendHeartBeat(REQUEST_TELEMETRY);
-            viewModelStateMutex_.lock();
-
-            lastHeartBeatSentMs_ = getTimeMs();
+        if (!isCurrentlyConnected_) {
+            return;
         }
-        return;
+
+        uint32_t currentTimeMs = getTimeMs();
+
+        if (peerState_ == PeerState::Alive && (currentTimeMs - lastFrameReceivedMs_) > PEER_TIMEOUT_MS) {
+            GUI_LOG_INFO("ConnectionVM", "Peer timeout (no frames for >%" PRIu32 " ms), transitioning to PeerUnknown",
+                         PEER_TIMEOUT_MS);
+            peerState_ = PeerState::Unknown;
+            peerEpochKnown_ = false;
+            shouldNotifyDisconnected = true;
+        }
+
+        if ((currentTimeMs - lastHeartbeatSentMs_) >= HEARTBEAT_INTERVAL_MS) {
+            shouldSendHeartbeat = true;
+            lastHeartbeatSentMs_ = currentTimeMs;
+        }
     }
 
-    if (connectionState_ != ConnectionState::FullyConnected) {
-        return;
+    if (shouldNotifyDisconnected && connectionStateChangedCallback_.is_valid()) {
+        connectionStateChangedCallback_(false);
     }
 
-    uint32_t timeSinceLastTelemetryMs = currentTimeMs - lastTelemetryReceivedMs_;
-
-    switch (heartBeatState_) {
-        case HeartBeatState::Idle:
-            if (timeSinceLastTelemetryMs >= TELEMETRY_IDLE_TIMEOUT_MS) {
-                GUI_LOG_INFO("ConnectionVM", "No telemetry for %" PRIu32 " ms, starting HeartBeat monitoring", timeSinceLastTelemetryMs);
-                heartBeatState_ = HeartBeatState::Active;
-                sendHeartBeat();
-                lastHeartBeatSentMs_ = currentTimeMs;
-                heartBeatResponseDeadlineMs_ = currentTimeMs + HEARTBEAT_RESPONSE_TIMEOUT_MS;
-                heartBeatState_ = HeartBeatState::WaitingForResponse;
-            }
-            break;
-
-        case HeartBeatState::Active:
-            if (currentTimeMs - lastHeartBeatSentMs_ >= HEARTBEAT_INTERVAL_MS) {
-                GUI_LOG_DEBUG("ConnectionVM", "Sending periodic HeartBeat");
-                sendHeartBeat();
-                lastHeartBeatSentMs_ = currentTimeMs;
-                heartBeatResponseDeadlineMs_ = currentTimeMs + HEARTBEAT_RESPONSE_TIMEOUT_MS;
-                heartBeatState_ = HeartBeatState::WaitingForResponse;
-            }
-            break;
-
-        case HeartBeatState::WaitingForResponse:
-            if (currentTimeMs >= heartBeatResponseDeadlineMs_) {
-                GUI_LOG_ERROR("ConnectionVM", "HeartBeat response timeout - connection lost");
-                handleConnectionLost();
-            }
-            break;
+    if (pendingTelemetryRequest_.exchange(false)) {
+        messageProcessor_.sendHeartBeat(true, localEpoch_);
+    } else if (shouldSendHeartbeat) {
+        bool sent = messageProcessor_.sendHeartBeat(false, localEpoch_);
+        if (!sent) {
+            GUI_LOG_ERROR("ConnectionVM", "Failed to send HeartBeat");
+        }
     }
 }
 
