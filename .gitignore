@@ -18,6 +18,8 @@
 /esp32/dependencies.lock
 /esp32/main/idf_component.yml
 /esp32/sdkconfig.old
+/esp32/.cache/
+/esp32/main/fix_depfile.cmake
 
 # Node.js artefacts for web backend
 /web/node_modules/
