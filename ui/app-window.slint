@@ -90,6 +90,7 @@ export component AppWindow inherits Window {
     in-out property <[string]> available_ports: [];
     in-out property <int> selected_port_index: -1;
     in-out property <string> connection_status: "";
+    in-out property <bool> reconnecting_overlay_visible: false;
 
     in-out property <[ChannelData]> channel_model: DefaultModels.channels;
 
@@ -104,8 +105,13 @@ export component AppWindow inherits Window {
 
     in-out property <ModeConfig> temp_mode_config: {
         mode_type: 0,
-        instant_data: { on_level: 255, velocity_sensitive: true },
-        ramped_data: { on_level: 255, velocity_sensitive: true, attack_time_ms: 100, release_time_ms: 100 },
+        instant_data: { on_level: 100.0, velocity_sensitive: true },
+        ramped_data: { on_level: 100.0, velocity_sensitive: true, attack_time_ms: 100, release_time_ms: 100 },
+        pulse_data: { on_level: 100.0, velocity_sensitive: true, attack_time_ms: 10, hold_time_ms: 100, release_time_ms: 50 },
+        toggle_data: { on_level: 100.0, velocity_sensitive: false, debounce_delay_ms: 50 },
+        adsr_data: { attack_level: 100.0, sustain_level: 78.4, velocity_sensitive: true, attack_time_ms: 50, decay_time_ms: 100, release_time_ms: 200 },
+        cc_data: { cc_number: 1, center_value: 64, left_max_pwm: 100.0, right_max_pwm: 100.0, deadband_range: 2 },
+        pitchbend_data: { base_level: 50.2, bend_range: 25.1, unipolar: false, velocity_sensitive: true },
     };
 
     in property <length> card_width: AppStyle.card_width;
@@ -206,6 +212,11 @@ export component AppWindow inherits Window {
                     mode_type: root.channel_model[i].mode_type,
                     instant_data: root.channel_model[i].instant_data,
                     ramped_data: root.channel_model[i].ramped_data,
+                    pulse_data: root.channel_model[i].pulse_data,
+                    toggle_data: root.channel_model[i].toggle_data,
+                    adsr_data: root.channel_model[i].adsr_data,
+                    cc_data: root.channel_model[i].cc_data,
+                    pitchbend_data: root.channel_model[i].pitchbend_data,
                 };
             }
 
@@ -222,7 +233,7 @@ export component AppWindow inherits Window {
         }
 
         Rectangle {
-            visible: show_popup;
+            visible: show_popup && !root.reconnecting_overlay_visible;
             z: 101;
             x: 0px;
             y: 0px;
@@ -311,7 +322,7 @@ export component AppWindow inherits Window {
     }
 
     ModalOverlay {
-        visible: root.show_numeric_input;
+        visible: root.show_numeric_input && !root.reconnecting_overlay_visible;
         dismissed => {
             root.show_numeric_input = false;
         }
@@ -336,6 +347,27 @@ export component AppWindow inherits Window {
 
             canceled => {
                 root.show_numeric_input = false;
+            }
+        }
+    }
+
+    Rectangle {
+        visible: root.reconnecting_overlay_visible && !root.show_connection_screen;
+        z: 500;
+        width: parent.width;
+        height: parent.height;
+        background: #000000CC;
+
+        TouchArea {}
+
+        VerticalBox {
+            alignment: center;
+
+            Text {
+                text: "Connection lost, reconnecting...";
+                font-size: AppStyle.font_size_heading;
+                color: AppStyle.text_primary;
+                horizontal-alignment: center;
             }
         }
     }
