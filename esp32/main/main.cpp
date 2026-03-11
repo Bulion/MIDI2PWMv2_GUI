@@ -1,4 +1,5 @@
 #include "app-window.h"
+#include "esp32_flash_writer.h"
 #include "log_forwarder.h"
 #include "uart_backend.h"
 #include "waveshare_rgb_lcd_port.h"
@@ -7,6 +8,8 @@
 #include "gui_common/view_models/channel_telemetry_view_model.h"
 #include "gui_common/view_models/connection_view_model.h"
 #include "gui_common/view_models/midi_message_view_model.h"
+
+#include "libcomm/ota_manager.h"
 
 #include <cstdlib>
 #include <esp_log.h>
@@ -200,6 +203,29 @@ struct Esp32Controller {
     }
 };
 
+static Esp32FlashWriter s_esp32FlashWriter;
+static gui::common::ConnectionViewModel *s_otaConnectionVm = nullptr;
+
+static void otaSendProgress(midi2pwm::ota::Target target, midi2pwm::ota::OtaStatus status,
+                            std::uint16_t chunksReceived, std::uint16_t totalChunks,
+                            const char *errorMessage)
+{
+    if (s_otaConnectionVm) {
+        s_otaConnectionVm->messageProcessor().sendOtaProgress(
+            target, status, chunksReceived, totalChunks, errorMessage);
+    }
+}
+
+static libcomm::OtaManager s_otaManager(
+    s_esp32FlashWriter,
+    midi2pwm::ota::Target::Esp32,
+    libcomm::OtaManager::SendProgressCallback::create<&otaSendProgress>());
+
+static void onOtaBegin(const midi2pwm::ota::OtaBegin &msg) { s_otaManager.handleBegin(msg); }
+static void onOtaData(const midi2pwm::ota::OtaData &msg) { s_otaManager.handleData(msg); }
+static void onOtaEnd(const midi2pwm::ota::OtaEnd &msg) { s_otaManager.handleEnd(msg); }
+static void onOtaAbort(const midi2pwm::ota::OtaAbort &msg) { s_otaManager.handleAbort(msg); }
+
 static uint16_t parseNoteString(const std::string &noteStr)
 {
     if (noteStr.empty() || noteStr == "---") {
@@ -270,6 +296,18 @@ extern "C" void app_main(void)
         ConnectionViewModel::ConnectionChangedCallback::create<Esp32Controller, &Esp32Controller::OnConnectionChanged>(controller));
     connectionViewModel.setRawMidiMessageCallback(
         ConnectionViewModel::RawMidiMessageCallback::create<Esp32Controller, &Esp32Controller::OnMidiMessage>(controller));
+
+    s_otaConnectionVm = &connectionViewModel;
+
+    auto &msgProc = connectionViewModel.messageProcessor();
+    msgProc.setOtaBeginCallback(
+        gui::common::MessageProcessor::OtaBeginCallback::create<&onOtaBegin>());
+    msgProc.setOtaDataCallback(
+        gui::common::MessageProcessor::OtaDataCallback::create<&onOtaData>());
+    msgProc.setOtaEndCallback(
+        gui::common::MessageProcessor::OtaEndCallback::create<&onOtaEnd>());
+    msgProc.setOtaAbortCallback(
+        gui::common::MessageProcessor::OtaAbortCallback::create<&onOtaAbort>());
 
     if (!connectionViewModel.connect("UART0")) {
         GUI_LOG_ERROR(TAG, "Failed to connect via UART backend");

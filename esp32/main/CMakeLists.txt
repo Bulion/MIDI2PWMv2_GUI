@@ -6,6 +6,7 @@ idf_component_register(
         "waveshare_rgb_lcd_port.cpp"
         "uart_backend.cpp"
         "log_forwarder.cpp"
+        "esp32_flash_writer.cpp"
     PRIV_REQUIRES driver
     INCLUDE_DIRS
         "."
