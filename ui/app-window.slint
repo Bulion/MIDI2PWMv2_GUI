@@ -9,6 +9,7 @@ import { ChannelCard } from "channel-card.slint";
 import { ChannelConfigPopup, ModeConfig } from "channel-config-popup.slint";
 import { NumericInputPopup } from "numeric-input-popup.slint";
 import { ModalOverlay } from "components/modal_overlay.slint";
+import { OtaUpdatePopup } from "ota-update-popup.slint";
 import { ChannelData } from "channel-data.slint";
 import { DefaultModels } from "default-models-data.slint";
 import { AppStyle } from "style.slint";
@@ -130,6 +131,17 @@ export component AppWindow inherits Window {
     private property <float> confirmed_value: -1;
     private property <string> confirmed_field: "";
 
+    private property <bool> show_ota_popup: false;
+    in-out property <int> ota_target_index: 0;
+    in-out property <string> ota_firmware_path: "";
+    in-out property <float> ota_progress_percent: 0.0;
+    in-out property <string> ota_status_text: "";
+    in-out property <bool> ota_is_uploading: false;
+
+    callback ota_browse_firmware();
+    callback ota_start_upload(int);
+    callback ota_cancel_upload();
+
     callback refresh_ports();
     callback connect_port(string);
     callback save_channel_config(int, string, ModeConfig);
@@ -195,6 +207,30 @@ export component AppWindow inherits Window {
             text: root.midi_message;
             color: AppStyle.text_primary;
             font-size: AppStyle.font_size_heading;
+        }
+
+        Rectangle {
+            x: parent.width - self.width - AppStyle.spacing_md;
+            y: parent.height / 2 - self.height / 2;
+            width: 60px;
+            height: 28px;
+            background: AppStyle.bg_button;
+
+            Text {
+                text: "OTA";
+                font-size: AppStyle.font_size_small;
+                color: AppStyle.text_primary;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+
+            TouchArea {
+                clicked => {
+                    root.show_ota_popup = true;
+                    root.ota_status_text = "";
+                    root.ota_progress_percent = 0.0;
+                }
+            }
         }
 
         for i in 16: ChannelCard {
@@ -348,6 +384,30 @@ export component AppWindow inherits Window {
             canceled => {
                 root.show_numeric_input = false;
             }
+        }
+    }
+
+    ModalOverlay {
+        visible: root.show_ota_popup && !root.reconnecting_overlay_visible;
+        dismissed => {
+            if (!root.ota_is_uploading) {
+                root.show_ota_popup = false;
+            }
+        }
+
+        OtaUpdatePopup {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            target_index <=> root.ota_target_index;
+            firmware_path <=> root.ota_firmware_path;
+            progress_percent <=> root.ota_progress_percent;
+            status_text <=> root.ota_status_text;
+            is_uploading <=> root.ota_is_uploading;
+
+            browse_firmware => { root.ota_browse_firmware(); }
+            start_upload => { root.ota_start_upload(root.ota_target_index); }
+            cancel_upload => { root.ota_cancel_upload(); }
+            close => { root.show_ota_popup = false; }
         }
     }
 

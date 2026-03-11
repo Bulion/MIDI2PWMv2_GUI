@@ -1,0 +1,137 @@
+import { VerticalBox, HorizontalBox, Button, ComboBox } from "std-widgets.slint";
+import { AppStyle } from "style.slint";
+
+export component OtaUpdatePopup inherits Rectangle {
+    in-out property <int> target_index: 0;
+    in-out property <string> firmware_path: "";
+    in-out property <float> progress_percent: 0.0;
+    in-out property <string> status_text: "";
+    in-out property <bool> is_uploading: false;
+
+    callback browse_firmware();
+    callback start_upload();
+    callback cancel_upload();
+    callback close();
+
+    width: 500px;
+    height: 300px;
+    background: AppStyle.bg_dialog;
+
+    VerticalBox {
+        padding: AppStyle.spacing_xl;
+        spacing: AppStyle.spacing_lg;
+
+        Text {
+            text: "OTA Firmware Update";
+            font-size: AppStyle.font_size_heading_sm;
+            color: AppStyle.text_primary;
+        }
+
+        HorizontalBox {
+            spacing: AppStyle.spacing_md;
+
+            Text {
+                text: "Target:";
+                font-size: AppStyle.font_size_body;
+                color: AppStyle.text_secondary;
+                vertical-alignment: center;
+                width: 60px;
+            }
+
+            ComboBox {
+                model: ["STM32", "ESP32"];
+                current-index <=> root.target_index;
+                enabled: !root.is_uploading;
+            }
+        }
+
+        HorizontalBox {
+            spacing: AppStyle.spacing_md;
+
+            Text {
+                text: "File:";
+                font-size: AppStyle.font_size_body;
+                color: AppStyle.text_secondary;
+                vertical-alignment: center;
+                width: 60px;
+            }
+
+            Rectangle {
+                background: AppStyle.bg_input;
+                height: AppStyle.input_height_sm;
+                horizontal-stretch: 1;
+
+                Text {
+                    text: root.firmware_path == "" ? "No file selected" : root.firmware_path;
+                    font-size: AppStyle.font_size_body;
+                    color: root.firmware_path == "" ? AppStyle.text_disabled : AppStyle.text_primary;
+                    x: AppStyle.spacing_md;
+                    vertical-alignment: center;
+                    overflow: elide;
+                    width: parent.width - 2 * AppStyle.spacing_md;
+                }
+            }
+
+            Button {
+                text: "Browse";
+                enabled: !root.is_uploading;
+                width: 80px;
+                clicked => { root.browse_firmware(); }
+            }
+        }
+
+        Rectangle {
+            height: 24px;
+            background: AppStyle.bg_track;
+
+            Rectangle {
+                x: 0px;
+                y: 0px;
+                width: parent.width * clamp(root.progress_percent / 100.0, 0.0, 1.0);
+                height: parent.height;
+                background: root.is_uploading ? AppStyle.accent_blue : AppStyle.accent_green;
+            }
+
+            Text {
+                text: root.is_uploading ? Math.round(root.progress_percent) + "%" : "";
+                font-size: AppStyle.font_size_small;
+                color: AppStyle.text_primary;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+
+        Text {
+            text: root.status_text;
+            font-size: AppStyle.font_size_body;
+            color: root.status_text == "" ? transparent :
+                   (root.is_uploading ? AppStyle.text_secondary : AppStyle.accent_green);
+            visible: root.status_text != "";
+        }
+
+        HorizontalBox {
+            spacing: AppStyle.spacing_lg;
+            horizontal-stretch: 1;
+
+            Rectangle { horizontal-stretch: 1; }
+
+            Button {
+                text: root.is_uploading ? "Cancel" : "Upload";
+                enabled: root.is_uploading || root.firmware_path != "";
+                clicked => {
+                    if (root.is_uploading) {
+                        root.cancel_upload();
+                    } else {
+                        root.start_upload();
+                    }
+                }
+            }
+
+            Button {
+                text: "Close";
+                enabled: !root.is_uploading;
+                clicked => { root.close(); }
+            }
+        }
+    }
+}

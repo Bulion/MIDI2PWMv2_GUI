@@ -7,10 +7,17 @@
 #include "gui_common/view_models/midi_message_view_model.h"
 #include "serial_backend.h"
 
+#include "ota_messages_generated.h"
+
 #include <atomic>
+#include <cstdint>
+#include <filesystem>
+#include <fstream>
 #include <memory>
 #include <string>
+#include <thread>
 #include <unordered_map>
+#include <vector>
 
 static uint16_t parseNoteString(const std::string &note_str);
 
@@ -30,6 +37,49 @@ struct DesktopController
     std::vector<gui::common::PortInfo> cached_ports;
     std::shared_ptr<slint::VectorModel<ChannelData>> channel_model;
     slint::SharedString last_midi_message;
+
+    void OnOtaProgress(const midi2pwm::ota::OtaProgress &progress)
+    {
+        auto status = progress.status();
+        auto chunks_received = progress.chunks_received();
+        auto total_chunks = progress.total_chunks();
+        std::string error_str = (progress.error_message()) ? progress.error_message()->str() : "";
+
+        slint::invoke_from_event_loop([this, status, chunks_received, total_chunks, error_str]() {
+            using Status = midi2pwm::ota::OtaStatus;
+            switch (status) {
+            case Status::Receiving: {
+                float pct = total_chunks > 0
+                    ? (static_cast<float>(chunks_received) / static_cast<float>(total_chunks)) * 100.0f
+                    : 0.0f;
+                app->set_ota_progress_percent(pct);
+                app->set_ota_status_text(slint::SharedString("Uploading..."));
+                break;
+            }
+            case Status::Applying:
+                app->set_ota_progress_percent(100.0f);
+                app->set_ota_status_text(slint::SharedString("Applying firmware..."));
+                break;
+            case Status::Rebooting:
+                app->set_ota_progress_percent(100.0f);
+                app->set_ota_status_text(slint::SharedString("Rebooting device..."));
+                app->set_ota_is_uploading(false);
+                break;
+            case Status::Idle:
+                app->set_ota_status_text(slint::SharedString("Upload complete"));
+                app->set_ota_is_uploading(false);
+                break;
+            case Status::Error: {
+                std::string msg = "Error: " + error_str;
+                app->set_ota_status_text(slint::SharedString(msg.c_str()));
+                app->set_ota_is_uploading(false);
+                break;
+            }
+            default:
+                break;
+            }
+        });
+    }
 
     void OnMidiMessage(const midi2pwm::midi::ChannelMessageT &message)
     {
@@ -225,6 +275,56 @@ struct DesktopController
     }
 };
 
+namespace ota_upload
+{
+
+static constexpr std::size_t CHUNK_SIZE = 3840;
+
+static std::uint32_t computeCrc32(const std::vector<std::uint8_t> &data)
+{
+    std::uint32_t crc = 0xFFFFFFFF;
+    for (std::uint8_t byte : data) {
+        crc ^= byte;
+        for (int bit = 0; bit < 8; ++bit) {
+            crc = (crc & 1) ? ((crc >> 1) ^ 0xEDB88320) : (crc >> 1);
+        }
+    }
+    return ~crc;
+}
+
+static std::vector<std::uint8_t> readFile(const std::string &path)
+{
+    std::ifstream file(path, std::ios::binary);
+    if (!file) {
+        return {};
+    }
+    return {std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+}
+
+static std::string openFileDialog()
+{
+    FILE *fp = popen("zenity --file-selection --title='Select firmware binary' --file-filter='Binary files | *.bin' 2>/dev/null", "r");
+    if (!fp) {
+        fp = popen("kdialog --getopenfilename . '*.bin' 2>/dev/null", "r");
+    }
+    if (!fp) {
+        return {};
+    }
+    char buf[1024] = {};
+    if (fgets(buf, sizeof(buf), fp) != nullptr) {
+        std::string result(buf);
+        while (!result.empty() && (result.back() == '\n' || result.back() == '\r')) {
+            result.pop_back();
+        }
+        pclose(fp);
+        return result;
+    }
+    pclose(fp);
+    return {};
+}
+
+} // namespace ota_upload
+
 int main()
 {
     gui::common::InitializeLibcommLogging();
@@ -250,6 +350,98 @@ int main()
         ConnectionViewModel::ConnectionChangedCallback::create<DesktopController, &DesktopController::OnConnectionChanged>(controller));
     connection_view_model.setRawMidiMessageCallback(
         ConnectionViewModel::RawMidiMessageCallback::create<DesktopController, &DesktopController::OnMidiMessage>(controller));
+
+    std::atomic<bool> ota_cancel_requested{false};
+
+    connection_view_model.messageProcessor().setOtaProgressCallback(
+        gui::common::MessageProcessor::OtaProgressCallback::create<DesktopController, &DesktopController::OnOtaProgress>(controller));
+
+    app->on_ota_browse_firmware([app]() {
+        std::string path = ota_upload::openFileDialog();
+        if (!path.empty()) {
+            slint::invoke_from_event_loop([app, path]() {
+                app->set_ota_firmware_path(slint::SharedString(path.c_str()));
+                app->set_ota_status_text(slint::SharedString(""));
+                app->set_ota_progress_percent(0.0f);
+            });
+        }
+    });
+
+    app->on_ota_start_upload([app, &connection_view_model, &ota_cancel_requested](int target_index) {
+        std::string path{app->get_ota_firmware_path()};
+        if (path.empty()) {
+            return;
+        }
+
+        auto firmware = ota_upload::readFile(path);
+        if (firmware.empty()) {
+            slint::invoke_from_event_loop([app]() {
+                app->set_ota_status_text(slint::SharedString("Error: could not read firmware file"));
+            });
+            return;
+        }
+
+        std::uint32_t firmware_crc = ota_upload::computeCrc32(firmware);
+        std::uint32_t firmware_size = static_cast<std::uint32_t>(firmware.size());
+        auto total_chunks = static_cast<std::uint16_t>((firmware_size + ota_upload::CHUNK_SIZE - 1) / ota_upload::CHUNK_SIZE);
+
+        auto target = (target_index == 0) ? midi2pwm::ota::Target::Stm32 : midi2pwm::ota::Target::Esp32;
+
+        std::string version = std::filesystem::path(path).filename().string();
+
+        ota_cancel_requested.store(false);
+
+        slint::invoke_from_event_loop([app]() {
+            app->set_ota_is_uploading(true);
+            app->set_ota_progress_percent(0.0f);
+            app->set_ota_status_text(slint::SharedString("Starting upload..."));
+        });
+
+        std::thread([app, &connection_view_model, &ota_cancel_requested,
+                     firmware = std::move(firmware), firmware_crc, firmware_size,
+                     total_chunks, target, version]() mutable {
+            auto &mp = connection_view_model.messageProcessor();
+
+            if (!mp.sendOtaBegin(target, firmware_size, firmware_crc, version.c_str(), total_chunks)) {
+                slint::invoke_from_event_loop([app]() {
+                    app->set_ota_status_text(slint::SharedString("Error: failed to send OtaBegin"));
+                    app->set_ota_is_uploading(false);
+                });
+                return;
+            }
+
+            for (std::uint16_t i = 0; i < total_chunks; ++i) {
+                if (ota_cancel_requested.load()) {
+                    mp.sendOtaAbort(target, "Cancelled by user");
+                    slint::invoke_from_event_loop([app]() {
+                        app->set_ota_status_text(slint::SharedString("Upload cancelled"));
+                        app->set_ota_is_uploading(false);
+                    });
+                    return;
+                }
+
+                std::size_t offset = static_cast<std::size_t>(i) * ota_upload::CHUNK_SIZE;
+                std::size_t chunk_len = std::min(ota_upload::CHUNK_SIZE, firmware.size() - offset);
+
+                if (!mp.sendOtaData(target, i, firmware.data() + offset, chunk_len)) {
+                    mp.sendOtaAbort(target, "Send failed");
+                    slint::invoke_from_event_loop([app]() {
+                        app->set_ota_status_text(slint::SharedString("Error: failed to send chunk"));
+                        app->set_ota_is_uploading(false);
+                    });
+                    return;
+                }
+
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            }
+
+            mp.sendOtaEnd(target);
+        }).detach();
+    });
+
+    app->on_ota_cancel_upload([&connection_view_model, &ota_cancel_requested, app]() {
+        ota_cancel_requested.store(true);
+    });
 
     auto initial_ports = connection_view_model.refreshPorts();
     controller.OnPortsChanged(initial_ports);
