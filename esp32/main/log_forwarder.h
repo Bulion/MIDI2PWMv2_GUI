@@ -3,7 +3,7 @@
 namespace gui::esp32
 {
 
-void initLogForwarder();
+void initLogForwarder(bool alsoMirrorToConsole = false);
 void deinitLogForwarder();
 
 } // namespace gui::esp32

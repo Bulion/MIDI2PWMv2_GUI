@@ -37,6 +37,7 @@ TaskHandle_t senderTaskHandle = nullptr;
 vprintf_like_t originalVprintf = nullptr;
 libcomm::LogEndpoint *logEndpoint = nullptr;
 std::atomic<bool> insideSend{false};
+bool mirrorToConsole{false};
 
 bool logUartWrite(const std::uint8_t *data, std::size_t size)
 {
@@ -131,8 +132,17 @@ int customLogVprintf(const char *fmt, va_list args)
         return 0;
     }
 
+    va_list argsCopy;
+    va_copy(argsCopy, args);
+
     char formatted[kTagMaxLength + kMessageMaxLength];
     int length = vsnprintf(formatted, sizeof(formatted), fmt, args);
+
+    if (mirrorToConsole && originalVprintf) {
+        originalVprintf(fmt, argsCopy);
+    }
+    va_end(argsCopy);
+
     if (length <= 0) {
         return length;
     }
@@ -169,8 +179,9 @@ void logSenderTask(void *param)
 
 } // namespace
 
-void initLogForwarder()
+void initLogForwarder(bool alsoMirrorToConsole)
 {
+    mirrorToConsole = alsoMirrorToConsole;
     static libcomm::LogEndpoint endpoint(
         libcomm::LogEndpoint::WriteCallback::create<&logUartWrite>());
     logEndpoint = &endpoint;
