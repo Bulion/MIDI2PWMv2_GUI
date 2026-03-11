@@ -1,7 +1,7 @@
 include(FetchContent)
 
 if(NOT DEFINED SLINT_VERSION)
-    set(SLINT_VERSION "1.12.1")
+    set(SLINT_VERSION "1.15.0")
 endif()
 
 if(NOT TARGET Slint::Slint)

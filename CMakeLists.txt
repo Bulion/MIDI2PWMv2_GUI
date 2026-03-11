@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.24)
 project(MIDI2PWMv2_GUI VERSION 1.0.0 LANGUAGES CXX)
 
-set(SLINT_VERSION "1.12.1" CACHE STRING "Slint version for all platforms")
+set(SLINT_VERSION "1.15.0" CACHE STRING "Slint version for all platforms")
 
 option(GUI_BUILD_DESKTOP "Build native desktop viewer" ON)
 option(GUI_BUILD_ESP32 "Enable ESP32 firmware build (invokes idf.py)" ON)
