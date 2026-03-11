@@ -84,7 +84,9 @@ struct ChannelData
 {
     etl::string<16> note;
     float voltage;
-    float current;
+    float currentMa;
+    float dutyCyclePercent;
+    bool isActive;
     etl::string<32> fault;
     std::uint8_t mode_type;
     InstantModeData instant_data;
@@ -107,6 +109,7 @@ public:
 
     void setUpdateCallback(UpdateCallback callback);
     void updateFromTelemetry(const midi2pwm::pwm::ChannelTelemetry &telemetry);
+    void updateFromConfig(const midi2pwm::pwm::ChannelConfig &config);
     void clear();
 
     ChannelsArray channels() const;
