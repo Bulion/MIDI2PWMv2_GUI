@@ -310,6 +310,11 @@ bool ConnectionViewModel::sendChannelConfig(const midi2pwm::pwm::ChannelConfigT 
     return messageProcessor_.sendChannelConfig(config);
 }
 
+MessageProcessor &ConnectionViewModel::messageProcessor()
+{
+    return messageProcessor_;
+}
+
 uint32_t ConnectionViewModel::getTimeMs() const
 {
     auto now = std::chrono::steady_clock::now();

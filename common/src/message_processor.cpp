@@ -9,6 +9,7 @@ namespace gui::common
 MessageProcessor::MessageProcessor()
     : midiEndpoint_(libcomm::MidiEndpoint::WriteCallback::create<&MessageProcessor::NullWrite>())
     , pwmEndpoint_(libcomm::PwmEndpoint::WriteCallback::create<&MessageProcessor::NullWrite>())
+    , otaEndpoint_(libcomm::OtaEndpoint::WriteCallback::create<&MessageProcessor::NullWrite>())
 {
     midiEndpoint_.OnChannelMessage(
         libcomm::MidiEndpoint::ChannelMessageHandler::create<MessageProcessor, &MessageProcessor::HandleMidiChannelMessage>(*this));
@@ -21,11 +22,23 @@ MessageProcessor::MessageProcessor()
 
     pwmEndpoint_.OnHeartBeat(
         libcomm::PwmEndpoint::HeartBeatHandler::create<MessageProcessor, &MessageProcessor::HandleHeartBeat>(*this));
+
+    otaEndpoint_.OnProgress(
+        libcomm::OtaEndpoint::ProgressHandler::create<MessageProcessor, &MessageProcessor::HandleOtaProgress>(*this));
+    otaEndpoint_.OnBegin(
+        libcomm::OtaEndpoint::BeginHandler::create<MessageProcessor, &MessageProcessor::HandleOtaBegin>(*this));
+    otaEndpoint_.OnData(
+        libcomm::OtaEndpoint::DataHandler::create<MessageProcessor, &MessageProcessor::HandleOtaData>(*this));
+    otaEndpoint_.OnEnd(
+        libcomm::OtaEndpoint::EndHandler::create<MessageProcessor, &MessageProcessor::HandleOtaEnd>(*this));
+    otaEndpoint_.OnAbort(
+        libcomm::OtaEndpoint::AbortHandler::create<MessageProcessor, &MessageProcessor::HandleOtaAbort>(*this));
 }
 
 MessageProcessor::MessageProcessor(WriteCallback writeCallback)
     : midiEndpoint_(writeCallback)
     , pwmEndpoint_(writeCallback)
+    , otaEndpoint_(writeCallback)
 {
     midiEndpoint_.OnChannelMessage(
         libcomm::MidiEndpoint::ChannelMessageHandler::create<MessageProcessor, &MessageProcessor::HandleMidiChannelMessage>(*this));
@@ -38,6 +51,17 @@ MessageProcessor::MessageProcessor(WriteCallback writeCallback)
 
     pwmEndpoint_.OnHeartBeat(
         libcomm::PwmEndpoint::HeartBeatHandler::create<MessageProcessor, &MessageProcessor::HandleHeartBeat>(*this));
+
+    otaEndpoint_.OnProgress(
+        libcomm::OtaEndpoint::ProgressHandler::create<MessageProcessor, &MessageProcessor::HandleOtaProgress>(*this));
+    otaEndpoint_.OnBegin(
+        libcomm::OtaEndpoint::BeginHandler::create<MessageProcessor, &MessageProcessor::HandleOtaBegin>(*this));
+    otaEndpoint_.OnData(
+        libcomm::OtaEndpoint::DataHandler::create<MessageProcessor, &MessageProcessor::HandleOtaData>(*this));
+    otaEndpoint_.OnEnd(
+        libcomm::OtaEndpoint::EndHandler::create<MessageProcessor, &MessageProcessor::HandleOtaEnd>(*this));
+    otaEndpoint_.OnAbort(
+        libcomm::OtaEndpoint::AbortHandler::create<MessageProcessor, &MessageProcessor::HandleOtaAbort>(*this));
 }
 
 bool MessageProcessor::NullWrite([[maybe_unused]] const std::uint8_t *, [[maybe_unused]] std::size_t)
@@ -68,6 +92,31 @@ void MessageProcessor::setHeartBeatCallback(HeartBeatCallback callback)
 void MessageProcessor::setResponseCallback(ResponseCallback callback)
 {
     responseCallback_ = callback;
+}
+
+void MessageProcessor::setOtaProgressCallback(OtaProgressCallback callback)
+{
+    otaProgressCallback_ = callback;
+}
+
+void MessageProcessor::setOtaBeginCallback(OtaBeginCallback callback)
+{
+    otaBeginCallback_ = callback;
+}
+
+void MessageProcessor::setOtaDataCallback(OtaDataCallback callback)
+{
+    otaDataCallback_ = callback;
+}
+
+void MessageProcessor::setOtaEndCallback(OtaEndCallback callback)
+{
+    otaEndCallback_ = callback;
+}
+
+void MessageProcessor::setOtaAbortCallback(OtaAbortCallback callback)
+{
+    otaAbortCallback_ = callback;
 }
 
 bool MessageProcessor::sendChannelConfig(const midi2pwm::pwm::ChannelConfigT &config)
@@ -228,10 +277,57 @@ void MessageProcessor::handleFrame(const std::uint8_t *frame, std::size_t size)
         }
     }
 
-    if (!has_midi_identifier && !has_pwm_identifier) {
-        GUI_LOG_WARNING("MessageProcessor", "Message has neither M2PW nor PWMX file identifier (expected at offset 4)");
+    bool has_ota_identifier = midi2pwm::ota::EnvelopeBufferHasIdentifier(frame);
+
+    if (has_ota_identifier) {
+        GUI_LOG_DEBUG("MessageProcessor", "Detected OTA envelope (OTAX identifier at offset 4)");
+
+        flatbuffers::Verifier verifier(frame, size);
+        if (midi2pwm::ota::VerifyEnvelopeBuffer(verifier)) {
+            const auto *envelope = midi2pwm::ota::GetEnvelope(frame);
+            if (envelope) {
+                switch (envelope->message_type()) {
+                case midi2pwm::ota::Message::OtaProgress:
+                    if (auto *msg = envelope->message_as_OtaProgress()) {
+                        HandleOtaProgress(*msg);
+                        return;
+                    }
+                    break;
+                case midi2pwm::ota::Message::OtaBegin:
+                    if (auto *msg = envelope->message_as_OtaBegin()) {
+                        HandleOtaBegin(*msg);
+                        return;
+                    }
+                    break;
+                case midi2pwm::ota::Message::OtaData:
+                    if (auto *msg = envelope->message_as_OtaData()) {
+                        HandleOtaData(*msg);
+                        return;
+                    }
+                    break;
+                case midi2pwm::ota::Message::OtaEnd:
+                    if (auto *msg = envelope->message_as_OtaEnd()) {
+                        HandleOtaEnd(*msg);
+                        return;
+                    }
+                    break;
+                case midi2pwm::ota::Message::OtaAbort:
+                    if (auto *msg = envelope->message_as_OtaAbort()) {
+                        HandleOtaAbort(*msg);
+                        return;
+                    }
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!has_midi_identifier && !has_pwm_identifier && !has_ota_identifier) {
+        GUI_LOG_WARNING("MessageProcessor", "Message has no recognized file identifier (expected M2PW, PWMX, or OTAX)");
     } else {
-        GUI_LOG_WARNING("MessageProcessor", "Message could not be parsed as MIDI or PWM envelope");
+        GUI_LOG_WARNING("MessageProcessor", "Message could not be parsed");
     }
 }
 
@@ -309,6 +405,90 @@ void MessageProcessor::HandleResponse(const midi2pwm::pwm::Response &response)
     }
 
     responseCallback_(response);
+}
+
+void MessageProcessor::HandleOtaProgress(const midi2pwm::ota::OtaProgress &progress)
+{
+    GUI_LOG_INFO("MessageProcessor", "OtaProgress received: status=%u, chunks=%u/%u",
+                 static_cast<unsigned>(progress.status()),
+                 progress.chunks_received(), progress.total_chunks());
+
+    if (otaProgressCallback_.is_valid()) {
+        otaProgressCallback_(progress);
+    }
+}
+
+void MessageProcessor::HandleOtaBegin(const midi2pwm::ota::OtaBegin &begin)
+{
+    GUI_LOG_INFO("MessageProcessor", "OtaBegin received: target=%u, size=%lu",
+                 static_cast<unsigned>(begin.target()),
+                 static_cast<unsigned long>(begin.firmware_size()));
+
+    if (otaBeginCallback_.is_valid()) {
+        otaBeginCallback_(begin);
+    }
+}
+
+void MessageProcessor::HandleOtaData(const midi2pwm::ota::OtaData &data)
+{
+    if (otaDataCallback_.is_valid()) {
+        otaDataCallback_(data);
+    }
+}
+
+void MessageProcessor::HandleOtaEnd(const midi2pwm::ota::OtaEnd &end)
+{
+    GUI_LOG_INFO("MessageProcessor", "OtaEnd received: target=%u",
+                 static_cast<unsigned>(end.target()));
+
+    if (otaEndCallback_.is_valid()) {
+        otaEndCallback_(end);
+    }
+}
+
+void MessageProcessor::HandleOtaAbort(const midi2pwm::ota::OtaAbort &abort)
+{
+    GUI_LOG_INFO("MessageProcessor", "OtaAbort received: target=%u",
+                 static_cast<unsigned>(abort.target()));
+
+    if (otaAbortCallback_.is_valid()) {
+        otaAbortCallback_(abort);
+    }
+}
+
+bool MessageProcessor::sendOtaBegin(midi2pwm::ota::Target target, std::uint32_t firmwareSize,
+                                     std::uint32_t firmwareCrc32, const char *versionString,
+                                     std::uint16_t totalChunks)
+{
+    auto buffer = libcomm::BuildOtaBeginMessage(target, firmwareSize, firmwareCrc32, versionString, totalChunks);
+    return otaEndpoint_.Send(std::move(buffer));
+}
+
+bool MessageProcessor::sendOtaData(midi2pwm::ota::Target target, std::uint16_t chunkIndex,
+                                    const std::uint8_t *data, std::size_t dataSize)
+{
+    auto buffer = libcomm::BuildOtaDataMessage(target, chunkIndex, data, dataSize);
+    return otaEndpoint_.Send(std::move(buffer));
+}
+
+bool MessageProcessor::sendOtaEnd(midi2pwm::ota::Target target)
+{
+    auto buffer = libcomm::BuildOtaEndMessage(target);
+    return otaEndpoint_.Send(std::move(buffer));
+}
+
+bool MessageProcessor::sendOtaAbort(midi2pwm::ota::Target target, const char *reason)
+{
+    auto buffer = libcomm::BuildOtaAbortMessage(target, reason);
+    return otaEndpoint_.Send(std::move(buffer));
+}
+
+bool MessageProcessor::sendOtaProgress(midi2pwm::ota::Target target, midi2pwm::ota::OtaStatus status,
+                                        std::uint16_t chunksReceived, std::uint16_t totalChunks,
+                                        const char *errorMessage)
+{
+    auto buffer = libcomm::BuildOtaProgressMessage(target, status, chunksReceived, totalChunks, errorMessage);
+    return otaEndpoint_.Send(std::move(buffer));
 }
 
 } // namespace gui::common
