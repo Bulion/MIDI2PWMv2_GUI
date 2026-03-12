@@ -1,0 +1,84 @@
+import { AppStyle } from "style.slint";
+
+export component OtaProgressScreen inherits Rectangle {
+    in property <int> status: 0;
+    in property <float> progress: 0.0;
+    in property <string> phase_text: "";
+    in property <string> detail_text: "";
+    in property <string> error_message: "";
+
+    width: 100%;
+    height: 100%;
+    background: AppStyle.bg_primary;
+
+    TouchArea {}
+
+    Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: 600px;
+        height: 200px;
+
+        Text {
+            x: (parent.width - self.width) / 2;
+            y: 0px;
+            text: "Firmware Update";
+            font-size: AppStyle.font_size_heading;
+            color: AppStyle.text_primary;
+            horizontal-alignment: center;
+        }
+
+        Text {
+            x: (parent.width - self.width) / 2;
+            y: 44px;
+            text: root.phase_text;
+            font-size: AppStyle.font_size_body_lg;
+            color: root.status == 6 ? AppStyle.status_error : AppStyle.text_secondary;
+            horizontal-alignment: center;
+        }
+
+        Rectangle {
+            x: 0px;
+            y: 80px;
+            width: parent.width;
+            height: 32px;
+            background: AppStyle.bg_track;
+
+            Rectangle {
+                x: 0px;
+                y: 0px;
+                width: parent.width * clamp(root.progress / 100.0, 0.0, 1.0);
+                height: parent.height;
+                background: root.status == 6 ? AppStyle.status_error : AppStyle.accent_blue;
+            }
+
+            Text {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                text: root.status == 2 ? Math.round(root.progress) + "%" : "";
+                font-size: AppStyle.font_size_body;
+                color: AppStyle.text_primary;
+                horizontal-alignment: center;
+            }
+        }
+
+        Text {
+            x: (parent.width - self.width) / 2;
+            y: 124px;
+            text: root.detail_text;
+            font-size: AppStyle.font_size_body;
+            color: AppStyle.text_tertiary;
+            horizontal-alignment: center;
+        }
+
+        Text {
+            visible: root.status == 6 && root.error_message != "";
+            x: (parent.width - self.width) / 2;
+            y: 156px;
+            text: root.error_message;
+            font-size: AppStyle.font_size_small;
+            color: AppStyle.status_error;
+            horizontal-alignment: center;
+        }
+    }
+}

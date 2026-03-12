@@ -10,6 +10,7 @@ import { ChannelConfigPopup, ModeConfig } from "channel-config-popup.slint";
 import { NumericInputPopup } from "numeric-input-popup.slint";
 import { ModalOverlay } from "components/modal_overlay.slint";
 import { OtaUpdatePopup } from "ota-update-popup.slint";
+import { OtaProgressScreen } from "ota-progress-screen.slint";
 import { ChannelData } from "channel-data.slint";
 import { DefaultModels } from "default-models-data.slint";
 import { AppStyle } from "style.slint";
@@ -137,6 +138,13 @@ export component AppWindow inherits Window {
     in-out property <float> ota_progress_percent: 0.0;
     in-out property <string> ota_status_text: "";
     in-out property <bool> ota_is_uploading: false;
+
+    in-out property <bool> ota_screen_visible: false;
+    in-out property <int> ota_screen_status: 0;
+    in-out property <float> ota_screen_progress: 0.0;
+    in-out property <string> ota_screen_phase_text: "";
+    in-out property <string> ota_screen_detail_text: "";
+    in-out property <string> ota_screen_error: "";
 
     callback ota_browse_firmware();
     callback ota_start_upload(int);
@@ -412,7 +420,7 @@ export component AppWindow inherits Window {
     }
 
     Rectangle {
-        visible: root.reconnecting_overlay_visible && !root.show_connection_screen;
+        visible: root.reconnecting_overlay_visible && !root.show_connection_screen && !root.ota_screen_visible;
         z: 500;
         width: parent.width;
         height: parent.height;
@@ -430,5 +438,17 @@ export component AppWindow inherits Window {
                 horizontal-alignment: center;
             }
         }
+    }
+
+    OtaProgressScreen {
+        visible: root.ota_screen_visible;
+        z: 600;
+        width: 100%;
+        height: 100%;
+        status: root.ota_screen_status;
+        progress: root.ota_screen_progress;
+        phase_text: root.ota_screen_phase_text;
+        detail_text: root.ota_screen_detail_text;
+        error_message: root.ota_screen_error;
     }
 }
