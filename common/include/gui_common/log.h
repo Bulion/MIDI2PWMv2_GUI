@@ -92,6 +92,7 @@
 #endif
 
 #include <cstdarg>
+#include <cstdio>
 #include "libcomm/logging.h"
 
 namespace gui::common
