@@ -3,6 +3,8 @@
 #include "app-window.h"
 #include "gui_common/comm_loop.h"
 #include "gui_common/log.h"
+#include "gui_common/midi_note_util.h"
+#include "gui_common/slint_adapters.h"
 #include "gui_common/view_models/channel_telemetry_view_model.h"
 #include "gui_common/view_models/connection_view_model.h"
 #include "gui_common/view_models/midi_message_view_model.h"
@@ -15,12 +17,10 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
-#include <unordered_map>
 #include <vector>
-
-static uint16_t parseNoteString(const std::string &note_str);
 
 using gui::common::ChannelTelemetryViewModel;
 using gui::common::ConnectionViewModel;
@@ -28,56 +28,6 @@ using gui::common::MidiMessageViewModel;
 
 namespace
 {
-
-ChannelData toSlintChannelData(const gui::common::ChannelData &channelData)
-{
-    ChannelData slintChannelData;
-    slintChannelData.note = slint::SharedString(channelData.note.c_str());
-    slintChannelData.voltage = channelData.voltage;
-    slintChannelData.current = channelData.currentMa;
-    slintChannelData.duty_cycle = channelData.dutyCyclePercent;
-    slintChannelData.is_active = channelData.isActive;
-    slintChannelData.fault = slint::SharedString(channelData.fault.c_str());
-    slintChannelData.mode_type = channelData.mode_type;
-    slintChannelData.instant_data.on_level = channelData.instant_data.on_level;
-    slintChannelData.instant_data.velocity_sensitive = channelData.instant_data.velocity_sensitive;
-    slintChannelData.ramped_data.on_level = channelData.ramped_data.on_level;
-    slintChannelData.ramped_data.velocity_sensitive = channelData.ramped_data.velocity_sensitive;
-    slintChannelData.ramped_data.attack_time_ms = channelData.ramped_data.attack_time_ms;
-    slintChannelData.ramped_data.release_time_ms = channelData.ramped_data.release_time_ms;
-    slintChannelData.pulse_data.on_level = channelData.pulse_data.on_level;
-    slintChannelData.pulse_data.velocity_sensitive = channelData.pulse_data.velocity_sensitive;
-    slintChannelData.pulse_data.attack_time_ms = channelData.pulse_data.attack_time_ms;
-    slintChannelData.pulse_data.hold_time_ms = channelData.pulse_data.hold_time_ms;
-    slintChannelData.pulse_data.release_time_ms = channelData.pulse_data.release_time_ms;
-    slintChannelData.toggle_data.on_level = channelData.toggle_data.on_level;
-    slintChannelData.toggle_data.velocity_sensitive = channelData.toggle_data.velocity_sensitive;
-    slintChannelData.toggle_data.debounce_delay_ms = channelData.toggle_data.debounce_delay_ms;
-    slintChannelData.adsr_data.attack_level = channelData.adsr_data.attack_level;
-    slintChannelData.adsr_data.sustain_level = channelData.adsr_data.sustain_level;
-    slintChannelData.adsr_data.velocity_sensitive = channelData.adsr_data.velocity_sensitive;
-    slintChannelData.adsr_data.attack_time_ms = channelData.adsr_data.attack_time_ms;
-    slintChannelData.adsr_data.decay_time_ms = channelData.adsr_data.decay_time_ms;
-    slintChannelData.adsr_data.release_time_ms = channelData.adsr_data.release_time_ms;
-    slintChannelData.cc_data.cc_number = channelData.cc_data.cc_number;
-    slintChannelData.cc_data.center_value = channelData.cc_data.center_value;
-    slintChannelData.cc_data.left_max_pwm = channelData.cc_data.left_max_pwm;
-    slintChannelData.cc_data.right_max_pwm = channelData.cc_data.right_max_pwm;
-    slintChannelData.cc_data.deadband_range = channelData.cc_data.deadband_range;
-    slintChannelData.pitchbend_data.base_level = channelData.pitchbend_data.base_level;
-    slintChannelData.pitchbend_data.bend_range = channelData.pitchbend_data.bend_range;
-    slintChannelData.pitchbend_data.unipolar = channelData.pitchbend_data.unipolar;
-    slintChannelData.pitchbend_data.velocity_sensitive = channelData.pitchbend_data.velocity_sensitive;
-    return slintChannelData;
-}
-
-std::string midiNoteToString(uint16_t noteNumber)
-{
-    static const char *NOTE_NAMES[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
-    int octave = (noteNumber / 12) - 1;
-    int noteIdx = noteNumber % 12;
-    return std::string(NOTE_NAMES[noteIdx]) + std::to_string(octave);
-}
 
 struct OtaProgressState
 {
@@ -347,101 +297,12 @@ int main()
         app->set_connection_status("");
     });
 
-    app->on_save_channel_config([&commLoop, app](int channel_idx, slint::SharedString note_str, ModeConfig mode_config) {
-        GUI_LOG_INFO("SaveConfig", "Callback invoked for channel %d", channel_idx);
-
-        uint16_t note_number = 255;
-        if (!note_str.empty()) {
-            std::string note_string{note_str};
-            note_number = parseNoteString(note_string);
+    app->on_save_channel_config([&commLoop](int channelIdx, slint::SharedString noteStr, ModeConfig modeConfig) {
+        uint16_t noteNumber = 255;
+        if (!noteStr.empty()) {
+            noteNumber = gui::common::parseNoteString(std::string{noteStr});
         }
-
-        midi2pwm::pwm::ChannelConfigT config;
-        config.channel_number = static_cast<uint16_t>(channel_idx);
-        config.configuration = midi2pwm::pwm::ChannelConfiguration::FullBridge;
-        config.note = note_number;
-        config.min_point = 0.0F;
-        config.midpoint = 0.0F;
-        config.max_point = 0.0F;
-        config.output_mode = static_cast<midi2pwm::pwm::OutputModeType>(mode_config.mode_type);
-
-        switch (mode_config.mode_type) {
-            case 0: {
-                auto params = std::make_unique<midi2pwm::pwm::InstantModeParamsT>();
-                params->on_level = gui::common::uiPercentToDevice(mode_config.instant_data.on_level);
-                params->velocity_sensitive = mode_config.instant_data.velocity_sensitive;
-                config.mode_params.type = midi2pwm::pwm::ModeParametersUnion::InstantModeParams;
-                config.mode_params.value = params.release();
-                break;
-            }
-            case 1: {
-                auto params = std::make_unique<midi2pwm::pwm::RampedModeParamsT>();
-                params->on_level = gui::common::uiPercentToDevice(mode_config.ramped_data.on_level);
-                params->velocity_sensitive = mode_config.ramped_data.velocity_sensitive;
-                params->attack_time_ms = static_cast<uint16_t>(mode_config.ramped_data.attack_time_ms);
-                params->release_time_ms = static_cast<uint16_t>(mode_config.ramped_data.release_time_ms);
-                config.mode_params.type = midi2pwm::pwm::ModeParametersUnion::RampedModeParams;
-                config.mode_params.value = params.release();
-                break;
-            }
-            case 2: {
-                auto params = std::make_unique<midi2pwm::pwm::PulseModeParamsT>();
-                params->on_level = gui::common::uiPercentToDevice(mode_config.pulse_data.on_level);
-                params->velocity_sensitive = mode_config.pulse_data.velocity_sensitive;
-                params->attack_time_ms = static_cast<uint16_t>(mode_config.pulse_data.attack_time_ms);
-                params->hold_time_ms = static_cast<uint16_t>(mode_config.pulse_data.hold_time_ms);
-                params->release_time_ms = static_cast<uint16_t>(mode_config.pulse_data.release_time_ms);
-                config.mode_params.type = midi2pwm::pwm::ModeParametersUnion::PulseModeParams;
-                config.mode_params.value = params.release();
-                break;
-            }
-            case 3: {
-                auto params = std::make_unique<midi2pwm::pwm::ToggleModeParamsT>();
-                params->on_level = gui::common::uiPercentToDevice(mode_config.toggle_data.on_level);
-                params->velocity_sensitive = mode_config.toggle_data.velocity_sensitive;
-                params->debounce_delay_ms = static_cast<uint16_t>(mode_config.toggle_data.debounce_delay_ms);
-                config.mode_params.type = midi2pwm::pwm::ModeParametersUnion::ToggleModeParams;
-                config.mode_params.value = params.release();
-                break;
-            }
-            case 4: {
-                auto params = std::make_unique<midi2pwm::pwm::ADSRModeParamsT>();
-                params->attack_level = gui::common::uiPercentToDevice(mode_config.adsr_data.attack_level);
-                params->sustain_level = gui::common::uiPercentToDevice(mode_config.adsr_data.sustain_level);
-                params->velocity_sensitive = mode_config.adsr_data.velocity_sensitive;
-                params->attack_time_ms = static_cast<uint16_t>(mode_config.adsr_data.attack_time_ms);
-                params->decay_time_ms = static_cast<uint16_t>(mode_config.adsr_data.decay_time_ms);
-                params->release_time_ms = static_cast<uint16_t>(mode_config.adsr_data.release_time_ms);
-                config.mode_params.type = midi2pwm::pwm::ModeParametersUnion::ADSRModeParams;
-                config.mode_params.value = params.release();
-                break;
-            }
-            case 5: {
-                auto params = std::make_unique<midi2pwm::pwm::CCControlModeParamsT>();
-                params->cc_number = static_cast<uint8_t>(mode_config.cc_data.cc_number);
-                params->center_value = static_cast<uint8_t>(mode_config.cc_data.center_value);
-                params->left_max_pwm = gui::common::uiPercentToDevice(mode_config.cc_data.left_max_pwm);
-                params->right_max_pwm = gui::common::uiPercentToDevice(mode_config.cc_data.right_max_pwm);
-                params->deadband_range = static_cast<uint8_t>(mode_config.cc_data.deadband_range);
-                config.mode_params.type = midi2pwm::pwm::ModeParametersUnion::CCControlModeParams;
-                config.mode_params.value = params.release();
-                break;
-            }
-            case 6: {
-                auto params = std::make_unique<midi2pwm::pwm::PitchBendModeParamsT>();
-                params->base_level = gui::common::uiPercentToDevice(mode_config.pitchbend_data.base_level);
-                params->bend_range = gui::common::uiPercentToDevice(mode_config.pitchbend_data.bend_range);
-                params->unipolar = mode_config.pitchbend_data.unipolar;
-                params->velocity_sensitive = mode_config.pitchbend_data.velocity_sensitive;
-                config.mode_params.type = midi2pwm::pwm::ModeParametersUnion::PitchBendModeParams;
-                config.mode_params.value = params.release();
-                break;
-            }
-            default:
-                GUI_LOG_WARNING("SaveConfig", "Unsupported mode type: %d", mode_config.mode_type);
-                break;
-        }
-
+        auto config = gui::common::buildChannelConfigFromModeConfig(channelIdx, noteNumber, modeConfig);
         commLoop.post(gui::common::CommLoop::SendConfigCmd{std::move(config)});
     });
 
@@ -529,12 +390,12 @@ int main()
             if (!channelModel) {
                 channelModel = std::make_shared<slint::VectorModel<ChannelData>>();
                 for (const auto &ch : channels) {
-                    channelModel->push_back(toSlintChannelData(ch));
+                    channelModel->push_back(gui::common::toSlintChannelData(ch));
                 }
                 app->set_channel_model(channelModel);
             } else {
                 for (std::size_t i = 0; i < channels.size(); ++i) {
-                    channelModel->set_row_data(i, toSlintChannelData(channels[i]));
+                    channelModel->set_row_data(i, gui::common::toSlintChannelData(channels[i]));
                 }
             }
         }
@@ -553,7 +414,7 @@ int main()
                     int channelIdx = channelAwaitingNote.exchange(-1);
                     isAssigningNote.store(false);
                     if (channelIdx >= 0) {
-                        std::string noteName = midiNoteToString(static_cast<uint16_t>(rawMsg.data1));
+                        std::string noteName = gui::common::midiNoteToString(static_cast<uint16_t>(rawMsg.data1));
                         app->invoke_note_assigned_from_backend(slint::SharedString{noteName.c_str()});
                     }
                 }
@@ -627,47 +488,4 @@ int main()
 
     GUI_LOG_INFO("Shutdown", "Cleanup complete, exiting");
     return 0;
-}
-
-static uint16_t parseNoteString(const std::string &note_str)
-{
-    if (note_str.empty() || note_str == "---") {
-        return 255;
-    }
-
-    static const std::unordered_map<std::string, int> NOTE_MAP = {
-        {"C", 0}, {"C#", 1}, {"D", 2}, {"D#", 3}, {"E", 4}, {"F", 5},
-        {"F#", 6}, {"G", 7}, {"G#", 8}, {"A", 9}, {"A#", 10}, {"B", 11}
-    };
-
-    size_t octave_pos = note_str.find_first_of("0123456789-");
-    if (octave_pos == std::string::npos || octave_pos == 0) {
-        return 255;
-    }
-
-    std::string note_name = note_str.substr(0, octave_pos);
-    std::string octave_str = note_str.substr(octave_pos);
-
-    if (octave_str.empty()) {
-        return 255;
-    }
-
-    int octave = 0;
-    try {
-        octave = std::stoi(octave_str);
-    } catch (const std::exception&) {
-        return 255;
-    }
-
-    auto it = NOTE_MAP.find(note_name);
-    if (it == NOTE_MAP.end()) {
-        return 255;
-    }
-
-    int midi_note = (octave + 1) * 12 + it->second;
-    if (midi_note < 0 || midi_note > 127) {
-        return 255;
-    }
-
-    return static_cast<uint16_t>(midi_note);
 }
