@@ -1,6 +1,7 @@
 #include <slint.h>
 
 #include "app-window.h"
+#include "gui_common/comm_loop.h"
 #include "gui_common/log.h"
 #include "gui_common/view_models/channel_telemetry_view_model.h"
 #include "gui_common/view_models/connection_view_model.h"
@@ -24,256 +25,85 @@ static uint16_t parseNoteString(const std::string &note_str);
 using gui::common::ChannelTelemetryViewModel;
 using gui::common::ConnectionViewModel;
 using gui::common::MidiMessageViewModel;
-using gui::common::ConnectionBackend;
 
-struct DesktopController
+namespace
 {
-    slint::ComponentHandle<AppWindow> app;
-    ConnectionViewModel &view_model;
-    MidiMessageViewModel &midi_view_model;
-    std::atomic<bool> is_assigning_note{false};
-    std::atomic<int> channel_awaiting_note{-1};
-    std::atomic<bool> is_assigning_cc{false};
-    std::vector<gui::common::PortInfo> cached_ports;
-    std::shared_ptr<slint::VectorModel<ChannelData>> channel_model;
-    slint::SharedString last_midi_message;
 
-    void OnOtaProgress(const midi2pwm::ota::OtaProgress &progress)
-    {
-        auto status = progress.status();
-        auto chunks_received = progress.chunks_received();
-        auto total_chunks = progress.total_chunks();
-        std::string error_str = (progress.error_message()) ? progress.error_message()->str() : "";
+ChannelData toSlintChannelData(const gui::common::ChannelData &channelData)
+{
+    ChannelData slintChannelData;
+    slintChannelData.note = slint::SharedString(channelData.note.c_str());
+    slintChannelData.voltage = channelData.voltage;
+    slintChannelData.current = channelData.currentMa;
+    slintChannelData.duty_cycle = channelData.dutyCyclePercent;
+    slintChannelData.is_active = channelData.isActive;
+    slintChannelData.fault = slint::SharedString(channelData.fault.c_str());
+    slintChannelData.mode_type = channelData.mode_type;
+    slintChannelData.instant_data.on_level = channelData.instant_data.on_level;
+    slintChannelData.instant_data.velocity_sensitive = channelData.instant_data.velocity_sensitive;
+    slintChannelData.ramped_data.on_level = channelData.ramped_data.on_level;
+    slintChannelData.ramped_data.velocity_sensitive = channelData.ramped_data.velocity_sensitive;
+    slintChannelData.ramped_data.attack_time_ms = channelData.ramped_data.attack_time_ms;
+    slintChannelData.ramped_data.release_time_ms = channelData.ramped_data.release_time_ms;
+    slintChannelData.pulse_data.on_level = channelData.pulse_data.on_level;
+    slintChannelData.pulse_data.velocity_sensitive = channelData.pulse_data.velocity_sensitive;
+    slintChannelData.pulse_data.attack_time_ms = channelData.pulse_data.attack_time_ms;
+    slintChannelData.pulse_data.hold_time_ms = channelData.pulse_data.hold_time_ms;
+    slintChannelData.pulse_data.release_time_ms = channelData.pulse_data.release_time_ms;
+    slintChannelData.toggle_data.on_level = channelData.toggle_data.on_level;
+    slintChannelData.toggle_data.velocity_sensitive = channelData.toggle_data.velocity_sensitive;
+    slintChannelData.toggle_data.debounce_delay_ms = channelData.toggle_data.debounce_delay_ms;
+    slintChannelData.adsr_data.attack_level = channelData.adsr_data.attack_level;
+    slintChannelData.adsr_data.sustain_level = channelData.adsr_data.sustain_level;
+    slintChannelData.adsr_data.velocity_sensitive = channelData.adsr_data.velocity_sensitive;
+    slintChannelData.adsr_data.attack_time_ms = channelData.adsr_data.attack_time_ms;
+    slintChannelData.adsr_data.decay_time_ms = channelData.adsr_data.decay_time_ms;
+    slintChannelData.adsr_data.release_time_ms = channelData.adsr_data.release_time_ms;
+    slintChannelData.cc_data.cc_number = channelData.cc_data.cc_number;
+    slintChannelData.cc_data.center_value = channelData.cc_data.center_value;
+    slintChannelData.cc_data.left_max_pwm = channelData.cc_data.left_max_pwm;
+    slintChannelData.cc_data.right_max_pwm = channelData.cc_data.right_max_pwm;
+    slintChannelData.cc_data.deadband_range = channelData.cc_data.deadband_range;
+    slintChannelData.pitchbend_data.base_level = channelData.pitchbend_data.base_level;
+    slintChannelData.pitchbend_data.bend_range = channelData.pitchbend_data.bend_range;
+    slintChannelData.pitchbend_data.unipolar = channelData.pitchbend_data.unipolar;
+    slintChannelData.pitchbend_data.velocity_sensitive = channelData.pitchbend_data.velocity_sensitive;
+    return slintChannelData;
+}
 
-        slint::invoke_from_event_loop([this, status, chunks_received, total_chunks, error_str]() {
-            using Status = midi2pwm::ota::OtaStatus;
-            switch (status) {
-            case Status::Receiving: {
-                float pct = total_chunks > 0
-                    ? (static_cast<float>(chunks_received) / static_cast<float>(total_chunks)) * 100.0f
-                    : 0.0f;
-                app->set_ota_progress_percent(pct);
-                app->set_ota_status_text(slint::SharedString("Uploading..."));
-                break;
-            }
-            case Status::Applying:
-                app->set_ota_progress_percent(100.0f);
-                app->set_ota_status_text(slint::SharedString("Applying firmware..."));
-                break;
-            case Status::Rebooting:
-                app->set_ota_progress_percent(100.0f);
-                app->set_ota_status_text(slint::SharedString("Rebooting device..."));
-                app->set_ota_is_uploading(false);
-                break;
-            case Status::Idle:
-                app->set_ota_status_text(slint::SharedString("Upload complete"));
-                app->set_ota_is_uploading(false);
-                break;
-            case Status::Error: {
-                std::string msg = "Error: " + error_str;
-                app->set_ota_status_text(slint::SharedString(msg.c_str()));
-                app->set_ota_is_uploading(false);
-                break;
-            }
-            default:
-                break;
-            }
-        });
-    }
+std::string midiNoteToString(uint16_t noteNumber)
+{
+    static const char *NOTE_NAMES[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+    int octave = (noteNumber / 12) - 1;
+    int noteIdx = noteNumber % 12;
+    return std::string(NOTE_NAMES[noteIdx]) + std::to_string(octave);
+}
 
-    void OnMidiMessage(const midi2pwm::midi::ChannelMessageT &message)
-    {
-        bool is_note_message = (message.message_type == midi2pwm::midi::ChannelMessageType::NoteOn ||
-                                message.message_type == midi2pwm::midi::ChannelMessageType::NoteOff);
-
-        GUI_LOG_VERBOSE("MIDI", "Received MIDI message: type=%d, channel=%d, data1=%u, data2=%u",
-                        static_cast<int>(message.message_type), message.channel, message.data1, message.data2);
-
-        if (is_assigning_note.load()) {
-            GUI_LOG_DEBUG("Assignment", "Processing MIDI during note assignment mode: is_note=%d, data1=%u",
-                          is_note_message, message.data1);
-
-            if (is_note_message && message.data1 <= 127) {
-                int channel_idx = channel_awaiting_note.exchange(-1);
-                is_assigning_note.store(false);
-
-                if (channel_idx >= 0) {
-                    std::string note_name = midiNoteToString(static_cast<uint16_t>(message.data1));
-                    slint::SharedString note_str{note_name.c_str()};
-
-                    GUI_LOG_INFO("Assignment", "Assigning note %s (MIDI %u) to channel %d",
-                                 note_name.c_str(), message.data1, channel_idx);
-
-                    slint::invoke_from_event_loop([handle = app, note_str]() {
-                        GUI_LOG_DEBUG("Assignment", "Invoking note_assigned_from_backend callback on UI thread");
-                        handle->invoke_note_assigned_from_backend(note_str);
-                    });
-                } else {
-                    GUI_LOG_WARNING("Assignment", "Assignment completed but channel_idx was invalid: %d", channel_idx);
-                }
-            } else {
-                if (!is_note_message) {
-                    GUI_LOG_DEBUG("Assignment", "Ignoring non-note message during assignment: type=%d",
-                                  static_cast<int>(message.message_type));
-                } else {
-                    GUI_LOG_WARNING("Assignment", "Received out-of-range note during assignment: %u", message.data1);
-                }
-            }
-        } else if (is_assigning_cc.load()) {
-            bool is_cc_message = (message.message_type == midi2pwm::midi::ChannelMessageType::ControlChange);
-
-            GUI_LOG_DEBUG("Assignment", "Processing MIDI during CC assignment mode: is_cc=%d, cc_num=%u",
-                          is_cc_message, message.data1);
-
-            if (is_cc_message && message.data1 <= 127) {
-                is_assigning_cc.store(false);
-                int cc_number = static_cast<int>(message.data1);
-
-                GUI_LOG_INFO("Assignment", "Assigning CC number %d", cc_number);
-
-                slint::invoke_from_event_loop([handle = app, cc_number]() {
-                    GUI_LOG_DEBUG("Assignment", "Invoking cc_assigned_from_backend callback on UI thread");
-                    handle->invoke_cc_assigned_from_backend(cc_number);
-                });
-            } else {
-                if (!is_cc_message) {
-                    GUI_LOG_DEBUG("Assignment", "Ignoring non-CC message during CC assignment: type=%d",
-                                  static_cast<int>(message.message_type));
-                } else {
-                    GUI_LOG_WARNING("Assignment", "Received out-of-range CC during assignment: %u", message.data1);
-                }
-            }
-        }
-
-        midi_view_model.updateFromChannelMessage(message);
-    }
-
-    void OnMessage(const MidiMessageViewModel::MessageString &text)
-    {
-        slint::SharedString shared{text.c_str()};
-        if (shared == last_midi_message) {
-            return;
-        }
-        last_midi_message = shared;
-        slint::invoke_from_event_loop([handle = app, shared]() {
-            handle->set_midi_message(shared);
-        });
-    }
-
-    static std::string midiNoteToString(uint16_t note_number)
-    {
-        static const char* NOTE_NAMES[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
-        int octave = (note_number / 12) - 1;
-        int note_idx = note_number % 12;
-        return std::string(NOTE_NAMES[note_idx]) + std::to_string(octave);
-    }
-
-    static ChannelData toSlintChannelData(const gui::common::ChannelData &channelData)
-    {
-        ChannelData slintChannelData;
-        slintChannelData.note = slint::SharedString(channelData.note.c_str());
-        slintChannelData.voltage = channelData.voltage;
-        slintChannelData.current = channelData.currentMa;
-        slintChannelData.duty_cycle = channelData.dutyCyclePercent;
-        slintChannelData.is_active = channelData.isActive;
-        slintChannelData.fault = slint::SharedString(channelData.fault.c_str());
-        slintChannelData.mode_type = channelData.mode_type;
-        slintChannelData.instant_data.on_level = channelData.instant_data.on_level;
-        slintChannelData.instant_data.velocity_sensitive = channelData.instant_data.velocity_sensitive;
-        slintChannelData.ramped_data.on_level = channelData.ramped_data.on_level;
-        slintChannelData.ramped_data.velocity_sensitive = channelData.ramped_data.velocity_sensitive;
-        slintChannelData.ramped_data.attack_time_ms = channelData.ramped_data.attack_time_ms;
-        slintChannelData.ramped_data.release_time_ms = channelData.ramped_data.release_time_ms;
-        slintChannelData.pulse_data.on_level = channelData.pulse_data.on_level;
-        slintChannelData.pulse_data.velocity_sensitive = channelData.pulse_data.velocity_sensitive;
-        slintChannelData.pulse_data.attack_time_ms = channelData.pulse_data.attack_time_ms;
-        slintChannelData.pulse_data.hold_time_ms = channelData.pulse_data.hold_time_ms;
-        slintChannelData.pulse_data.release_time_ms = channelData.pulse_data.release_time_ms;
-        slintChannelData.toggle_data.on_level = channelData.toggle_data.on_level;
-        slintChannelData.toggle_data.velocity_sensitive = channelData.toggle_data.velocity_sensitive;
-        slintChannelData.toggle_data.debounce_delay_ms = channelData.toggle_data.debounce_delay_ms;
-        slintChannelData.adsr_data.attack_level = channelData.adsr_data.attack_level;
-        slintChannelData.adsr_data.sustain_level = channelData.adsr_data.sustain_level;
-        slintChannelData.adsr_data.velocity_sensitive = channelData.adsr_data.velocity_sensitive;
-        slintChannelData.adsr_data.attack_time_ms = channelData.adsr_data.attack_time_ms;
-        slintChannelData.adsr_data.decay_time_ms = channelData.adsr_data.decay_time_ms;
-        slintChannelData.adsr_data.release_time_ms = channelData.adsr_data.release_time_ms;
-        slintChannelData.cc_data.cc_number = channelData.cc_data.cc_number;
-        slintChannelData.cc_data.center_value = channelData.cc_data.center_value;
-        slintChannelData.cc_data.left_max_pwm = channelData.cc_data.left_max_pwm;
-        slintChannelData.cc_data.right_max_pwm = channelData.cc_data.right_max_pwm;
-        slintChannelData.cc_data.deadband_range = channelData.cc_data.deadband_range;
-        slintChannelData.pitchbend_data.base_level = channelData.pitchbend_data.base_level;
-        slintChannelData.pitchbend_data.bend_range = channelData.pitchbend_data.bend_range;
-        slintChannelData.pitchbend_data.unipolar = channelData.pitchbend_data.unipolar;
-        slintChannelData.pitchbend_data.velocity_sensitive = channelData.pitchbend_data.velocity_sensitive;
-        return slintChannelData;
-    }
-
-    void OnChannelTelemetry(const ChannelTelemetryViewModel::ChannelsArray &channels)
-    {
-        slint::invoke_from_event_loop([this, handle = app, channels]() {
-            if (!channel_model) {
-                channel_model = std::make_shared<slint::VectorModel<ChannelData>>();
-                for (const auto &channelData : channels) {
-                    channel_model->push_back(toSlintChannelData(channelData));
-                }
-                handle->set_channel_model(channel_model);
-                return;
-            }
-
-            for (std::size_t i = 0; i < channels.size(); ++i) {
-                channel_model->set_row_data(i, toSlintChannelData(channels[i]));
-            }
-        });
-    }
-
-    void OnPortsChanged(const std::vector<gui::common::PortInfo> &ports)
-    {
-        cached_ports = ports;
-
-        auto model = std::make_shared<slint::VectorModel<slint::SharedString>>();
-        for (const auto &portInfo : ports) {
-            model->push_back(slint::SharedString(portInfo.friendlyName.c_str()));
-        }
-
-        const bool empty = ports.empty();
-        slint::invoke_from_event_loop([handle = app, model, empty]() {
-            handle->set_available_ports(model);
-            if (empty) {
-                handle->set_selected_port_index(-1);
-                handle->set_connection_status("No serial ports found");
-            } else {
-                handle->set_selected_port_index(0);
-                handle->set_connection_status("");
-            }
-        });
-    }
-
-    void OnConnectionChanged(bool peerAlive) const
-    {
-        GUI_LOG_INFO("Connection", "Connection state changed: %s", peerAlive ? "PEER_ALIVE" : "PEER_LOST");
-
-        slint::invoke_from_event_loop([this, handle = app, peerAlive]() {
-            if (peerAlive) {
-                handle->set_show_connection_screen(false);
-                handle->set_waiting_for_device_data(false);
-                handle->set_reconnecting_overlay_visible(false);
-                handle->set_connection_status("");
-            } else {
-                if (view_model.isConnected()) {
-                    handle->set_reconnecting_overlay_visible(true);
-                } else {
-                    handle->set_show_connection_screen(true);
-                    handle->set_waiting_for_device_data(false);
-                    handle->set_reconnecting_overlay_visible(false);
-                    handle->set_connection_status("Connection lost. Select a port to reconnect.");
-                    view_model.refreshPorts();
-                }
-            }
-        });
-    }
+struct OtaProgressState
+{
+    std::atomic<uint32_t> version{0};
+    std::mutex mutex;
+    midi2pwm::ota::OtaStatus status{midi2pwm::ota::OtaStatus::Idle};
+    uint16_t chunksReceived{0};
+    uint16_t totalChunks{0};
+    std::string errorMessage;
 };
+
+static OtaProgressState s_otaProgress;
+
+static void onOtaProgressReceived(const midi2pwm::ota::OtaProgress &progress)
+{
+    {
+        std::lock_guard<std::mutex> lock(s_otaProgress.mutex);
+        s_otaProgress.status = progress.status();
+        s_otaProgress.chunksReceived = progress.chunks_received();
+        s_otaProgress.totalChunks = progress.total_chunks();
+        s_otaProgress.errorMessage = progress.error_message() ? progress.error_message()->str() : "";
+    }
+    s_otaProgress.version.fetch_add(1, std::memory_order_release);
+}
+
+} // namespace
 
 namespace ota_upload
 {
@@ -333,28 +163,33 @@ int main()
 
     app->window().set_size(slint::LogicalSize({800, 520}));
 
-    MidiMessageViewModel message_view_model;
-    ChannelTelemetryViewModel channel_telemetry_view_model;
+    MidiMessageViewModel midiViewModel;
+    ChannelTelemetryViewModel channelTelemetryViewModel;
     gui::desktop::SerialBackend backend;
-    ConnectionViewModel connection_view_model{backend, message_view_model, channel_telemetry_view_model};
+    ConnectionViewModel connectionViewModel{backend, midiViewModel, channelTelemetryViewModel};
 
-    DesktopController controller{app, connection_view_model, message_view_model};
+    gui::common::CommLoop commLoop(connectionViewModel);
 
-    message_view_model.setUpdateCallback(
-        MidiMessageViewModel::UpdateCallback::create<DesktopController, &DesktopController::OnMessage>(controller));
-    channel_telemetry_view_model.setUpdateCallback(
-        ChannelTelemetryViewModel::UpdateCallback::create<DesktopController, &DesktopController::OnChannelTelemetry>(controller));
-    connection_view_model.setPortsChangedCallback(
-        ConnectionViewModel::PortsChangedCallback::create<DesktopController, &DesktopController::OnPortsChanged>(controller));
-    connection_view_model.setConnectionChangedCallback(
-        ConnectionViewModel::ConnectionChangedCallback::create<DesktopController, &DesktopController::OnConnectionChanged>(controller));
-    connection_view_model.setRawMidiMessageCallback(
-        ConnectionViewModel::RawMidiMessageCallback::create<DesktopController, &DesktopController::OnMidiMessage>(controller));
+    std::atomic<bool> isAssigningNote{false};
+    std::atomic<int> channelAwaitingNote{-1};
+    std::atomic<bool> isAssigningCc{false};
 
-    std::atomic<bool> ota_cancel_requested{false};
+    std::atomic<bool> otaCancelRequested{false};
 
-    connection_view_model.messageProcessor().setOtaProgressCallback(
-        gui::common::MessageProcessor::OtaProgressCallback::create<DesktopController, &DesktopController::OnOtaProgress>(controller));
+    std::atomic<uint32_t> portsVersion{0};
+    std::vector<gui::common::PortInfo> cachedPorts;
+    std::mutex portsMutex;
+
+    auto &msgProc = connectionViewModel.messageProcessor();
+    msgProc.setOtaProgressCallback(
+        gui::common::MessageProcessor::OtaProgressCallback::create<&onOtaProgressReceived>());
+
+    std::thread commThread([&commLoop]() {
+        while (!commLoop.shouldStop()) {
+            commLoop.runOnce();
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+    });
 
     app->on_ota_browse_firmware([app]() {
         std::string path = ota_upload::openFileDialog();
@@ -367,7 +202,7 @@ int main()
         }
     });
 
-    app->on_ota_start_upload([app, &connection_view_model, &ota_cancel_requested](int target_index) {
+    app->on_ota_start_upload([app, &connectionViewModel, &otaCancelRequested](int target_index) {
         std::string path{app->get_ota_firmware_path()};
         if (path.empty()) {
             return;
@@ -375,9 +210,7 @@ int main()
 
         auto firmware = ota_upload::readFile(path);
         if (firmware.empty()) {
-            slint::invoke_from_event_loop([app]() {
-                app->set_ota_status_text(slint::SharedString("Error: could not read firmware file"));
-            });
+            app->set_ota_status_text(slint::SharedString("Error: could not read firmware file"));
             return;
         }
 
@@ -389,18 +222,16 @@ int main()
 
         std::string version = std::filesystem::path(path).filename().string();
 
-        ota_cancel_requested.store(false);
+        otaCancelRequested.store(false);
 
-        slint::invoke_from_event_loop([app]() {
-            app->set_ota_is_uploading(true);
-            app->set_ota_progress_percent(0.0f);
-            app->set_ota_status_text(slint::SharedString("Starting upload..."));
-        });
+        app->set_ota_is_uploading(true);
+        app->set_ota_progress_percent(0.0f);
+        app->set_ota_status_text(slint::SharedString("Starting upload..."));
 
-        std::thread([app, &connection_view_model, &ota_cancel_requested,
+        std::thread([app, &connectionViewModel, &otaCancelRequested,
                      firmware = std::move(firmware), firmware_crc, firmware_size,
                      total_chunks, target, version]() mutable {
-            auto &mp = connection_view_model.messageProcessor();
+            auto &mp = connectionViewModel.messageProcessor();
 
             if (!mp.sendOtaBegin(target, firmware_size, firmware_crc, version.c_str(), total_chunks)) {
                 slint::invoke_from_event_loop([app]() {
@@ -411,7 +242,7 @@ int main()
             }
 
             for (std::uint16_t i = 0; i < total_chunks; ++i) {
-                if (ota_cancel_requested.load()) {
+                if (otaCancelRequested.load()) {
                     mp.sendOtaAbort(target, "Cancelled by user");
                     slint::invoke_from_event_loop([app]() {
                         app->set_ota_status_text(slint::SharedString("Upload cancelled"));
@@ -439,68 +270,90 @@ int main()
         }).detach();
     });
 
-    app->on_ota_cancel_upload([&connection_view_model, &ota_cancel_requested, app]() {
-        ota_cancel_requested.store(true);
+    app->on_ota_cancel_upload([&otaCancelRequested]() {
+        otaCancelRequested.store(true);
     });
 
-    auto initial_ports = connection_view_model.refreshPorts();
-    controller.OnPortsChanged(initial_ports);
+    auto initialPorts = connectionViewModel.refreshPorts();
+    {
+        std::lock_guard<std::mutex> lock(portsMutex);
+        cachedPorts = initialPorts;
+    }
 
-    app->on_refresh_ports([&connection_view_model]() {
-        connection_view_model.refreshPorts();
+    auto portsModel = std::make_shared<slint::VectorModel<slint::SharedString>>();
+    for (const auto &portInfo : initialPorts) {
+        portsModel->push_back(slint::SharedString(portInfo.friendlyName.c_str()));
+    }
+    app->set_available_ports(portsModel);
+    if (initialPorts.empty()) {
+        app->set_selected_port_index(-1);
+        app->set_connection_status("No serial ports found");
+    } else {
+        app->set_selected_port_index(0);
+        app->set_connection_status("");
+    }
+
+    app->on_refresh_ports([&connectionViewModel, &cachedPorts, &portsMutex, app]() {
+        auto ports = connectionViewModel.refreshPorts();
+        {
+            std::lock_guard<std::mutex> lock(portsMutex);
+            cachedPorts = ports;
+        }
+
+        auto model = std::make_shared<slint::VectorModel<slint::SharedString>>();
+        for (const auto &portInfo : ports) {
+            model->push_back(slint::SharedString(portInfo.friendlyName.c_str()));
+        }
+        app->set_available_ports(model);
+        if (ports.empty()) {
+            app->set_selected_port_index(-1);
+            app->set_connection_status("No serial ports found");
+        } else {
+            app->set_selected_port_index(0);
+            app->set_connection_status("");
+        }
     });
 
-    app->on_connect_port([&controller, &connection_view_model, app](const slint::SharedString &friendlyName) {
+    app->on_connect_port([&cachedPorts, &portsMutex, &commLoop, app](const slint::SharedString &friendlyName) {
         if (friendlyName.empty()) {
-            slint::invoke_from_event_loop([app]() {
-                app->set_connection_status("Select a port before connecting");
-            });
+            app->set_connection_status("Select a port before connecting");
             return;
         }
 
         std::string portPathToConnect;
         std::string friendlyNameStr{friendlyName};
 
-        for (const auto &portInfo : controller.cached_ports) {
-            if (portInfo.friendlyName == friendlyNameStr) {
-                portPathToConnect = portInfo.portPath;
-                break;
+        {
+            std::lock_guard<std::mutex> lock(portsMutex);
+            for (const auto &portInfo : cachedPorts) {
+                if (portInfo.friendlyName == friendlyNameStr) {
+                    portPathToConnect = portInfo.portPath;
+                    break;
+                }
             }
         }
 
         if (portPathToConnect.empty()) {
-            slint::invoke_from_event_loop([app]() {
-                app->set_connection_status("Port not found");
-            });
+            app->set_connection_status("Port not found");
             return;
         }
 
         GUI_LOG_INFO("Connect", "Connecting to port path: %s (from friendly name: %s)",
                      portPathToConnect.c_str(), friendlyNameStr.c_str());
 
-        if (!connection_view_model.connect(portPathToConnect)) {
-            slint::invoke_from_event_loop([app]() {
-                app->set_connection_status("Failed to open selected port");
-            });
-        } else {
-            slint::invoke_from_event_loop([app]() {
-                app->set_show_connection_screen(false);
-                app->set_waiting_for_device_data(true);
-                app->set_connection_status("");
-            });
-        }
+        commLoop.post(gui::common::CommLoop::ConnectCmd{portPathToConnect});
+        app->set_show_connection_screen(false);
+        app->set_waiting_for_device_data(true);
+        app->set_connection_status("");
     });
 
-    app->on_save_channel_config([&connection_view_model, app](int channel_idx, slint::SharedString note_str, ModeConfig mode_config) {
+    app->on_save_channel_config([&commLoop, app](int channel_idx, slint::SharedString note_str, ModeConfig mode_config) {
         GUI_LOG_INFO("SaveConfig", "Callback invoked for channel %d", channel_idx);
 
         uint16_t note_number = 255;
-
         if (!note_str.empty()) {
             std::string note_string{note_str};
-            GUI_LOG_DEBUG("SaveConfig", "Parsing note string: %s", note_string.c_str());
             note_number = parseNoteString(note_string);
-            GUI_LOG_DEBUG("SaveConfig", "Parsed note number: %u", note_number);
         }
 
         midi2pwm::pwm::ChannelConfigT config;
@@ -510,79 +363,78 @@ int main()
         config.min_point = 0.0F;
         config.midpoint = 0.0F;
         config.max_point = 0.0F;
-
         config.output_mode = static_cast<midi2pwm::pwm::OutputModeType>(mode_config.mode_type);
 
         switch (mode_config.mode_type) {
             case 0: {
-                auto instant_params = std::make_unique<midi2pwm::pwm::InstantModeParamsT>();
-                instant_params->on_level = gui::common::uiPercentToDevice(mode_config.instant_data.on_level);
-                instant_params->velocity_sensitive = mode_config.instant_data.velocity_sensitive;
+                auto params = std::make_unique<midi2pwm::pwm::InstantModeParamsT>();
+                params->on_level = gui::common::uiPercentToDevice(mode_config.instant_data.on_level);
+                params->velocity_sensitive = mode_config.instant_data.velocity_sensitive;
                 config.mode_params.type = midi2pwm::pwm::ModeParametersUnion::InstantModeParams;
-                config.mode_params.value = instant_params.release();
+                config.mode_params.value = params.release();
                 break;
             }
             case 1: {
-                auto ramped_params = std::make_unique<midi2pwm::pwm::RampedModeParamsT>();
-                ramped_params->on_level = gui::common::uiPercentToDevice(mode_config.ramped_data.on_level);
-                ramped_params->velocity_sensitive = mode_config.ramped_data.velocity_sensitive;
-                ramped_params->attack_time_ms = static_cast<uint16_t>(mode_config.ramped_data.attack_time_ms);
-                ramped_params->release_time_ms = static_cast<uint16_t>(mode_config.ramped_data.release_time_ms);
+                auto params = std::make_unique<midi2pwm::pwm::RampedModeParamsT>();
+                params->on_level = gui::common::uiPercentToDevice(mode_config.ramped_data.on_level);
+                params->velocity_sensitive = mode_config.ramped_data.velocity_sensitive;
+                params->attack_time_ms = static_cast<uint16_t>(mode_config.ramped_data.attack_time_ms);
+                params->release_time_ms = static_cast<uint16_t>(mode_config.ramped_data.release_time_ms);
                 config.mode_params.type = midi2pwm::pwm::ModeParametersUnion::RampedModeParams;
-                config.mode_params.value = ramped_params.release();
+                config.mode_params.value = params.release();
                 break;
             }
             case 2: {
-                auto pulse_params = std::make_unique<midi2pwm::pwm::PulseModeParamsT>();
-                pulse_params->on_level = gui::common::uiPercentToDevice(mode_config.pulse_data.on_level);
-                pulse_params->velocity_sensitive = mode_config.pulse_data.velocity_sensitive;
-                pulse_params->attack_time_ms = static_cast<uint16_t>(mode_config.pulse_data.attack_time_ms);
-                pulse_params->hold_time_ms = static_cast<uint16_t>(mode_config.pulse_data.hold_time_ms);
-                pulse_params->release_time_ms = static_cast<uint16_t>(mode_config.pulse_data.release_time_ms);
+                auto params = std::make_unique<midi2pwm::pwm::PulseModeParamsT>();
+                params->on_level = gui::common::uiPercentToDevice(mode_config.pulse_data.on_level);
+                params->velocity_sensitive = mode_config.pulse_data.velocity_sensitive;
+                params->attack_time_ms = static_cast<uint16_t>(mode_config.pulse_data.attack_time_ms);
+                params->hold_time_ms = static_cast<uint16_t>(mode_config.pulse_data.hold_time_ms);
+                params->release_time_ms = static_cast<uint16_t>(mode_config.pulse_data.release_time_ms);
                 config.mode_params.type = midi2pwm::pwm::ModeParametersUnion::PulseModeParams;
-                config.mode_params.value = pulse_params.release();
+                config.mode_params.value = params.release();
                 break;
             }
             case 3: {
-                auto toggle_params = std::make_unique<midi2pwm::pwm::ToggleModeParamsT>();
-                toggle_params->on_level = gui::common::uiPercentToDevice(mode_config.toggle_data.on_level);
-                toggle_params->velocity_sensitive = mode_config.toggle_data.velocity_sensitive;
-                toggle_params->debounce_delay_ms = static_cast<uint16_t>(mode_config.toggle_data.debounce_delay_ms);
+                auto params = std::make_unique<midi2pwm::pwm::ToggleModeParamsT>();
+                params->on_level = gui::common::uiPercentToDevice(mode_config.toggle_data.on_level);
+                params->velocity_sensitive = mode_config.toggle_data.velocity_sensitive;
+                params->debounce_delay_ms = static_cast<uint16_t>(mode_config.toggle_data.debounce_delay_ms);
                 config.mode_params.type = midi2pwm::pwm::ModeParametersUnion::ToggleModeParams;
-                config.mode_params.value = toggle_params.release();
+                config.mode_params.value = params.release();
                 break;
             }
             case 4: {
-                auto adsr_params = std::make_unique<midi2pwm::pwm::ADSRModeParamsT>();
-                adsr_params->attack_level = gui::common::uiPercentToDevice(mode_config.adsr_data.attack_level);
-                adsr_params->sustain_level = gui::common::uiPercentToDevice(mode_config.adsr_data.sustain_level);
-                adsr_params->velocity_sensitive = mode_config.adsr_data.velocity_sensitive;
-                adsr_params->attack_time_ms = static_cast<uint16_t>(mode_config.adsr_data.attack_time_ms);
-                adsr_params->decay_time_ms = static_cast<uint16_t>(mode_config.adsr_data.decay_time_ms);
-                adsr_params->release_time_ms = static_cast<uint16_t>(mode_config.adsr_data.release_time_ms);
+                auto params = std::make_unique<midi2pwm::pwm::ADSRModeParamsT>();
+                params->attack_level = gui::common::uiPercentToDevice(mode_config.adsr_data.attack_level);
+                params->sustain_level = gui::common::uiPercentToDevice(mode_config.adsr_data.sustain_level);
+                params->velocity_sensitive = mode_config.adsr_data.velocity_sensitive;
+                params->attack_time_ms = static_cast<uint16_t>(mode_config.adsr_data.attack_time_ms);
+                params->decay_time_ms = static_cast<uint16_t>(mode_config.adsr_data.decay_time_ms);
+                params->release_time_ms = static_cast<uint16_t>(mode_config.adsr_data.release_time_ms);
                 config.mode_params.type = midi2pwm::pwm::ModeParametersUnion::ADSRModeParams;
-                config.mode_params.value = adsr_params.release();
+                config.mode_params.value = params.release();
                 break;
             }
             case 5: {
-                auto cc_params = std::make_unique<midi2pwm::pwm::CCControlModeParamsT>();
-                cc_params->cc_number = static_cast<uint8_t>(mode_config.cc_data.cc_number);
-                cc_params->center_value = static_cast<uint8_t>(mode_config.cc_data.center_value);
-                cc_params->left_max_pwm = gui::common::uiPercentToDevice(mode_config.cc_data.left_max_pwm);
-                cc_params->right_max_pwm = gui::common::uiPercentToDevice(mode_config.cc_data.right_max_pwm);
-                cc_params->deadband_range = static_cast<uint8_t>(mode_config.cc_data.deadband_range);
+                auto params = std::make_unique<midi2pwm::pwm::CCControlModeParamsT>();
+                params->cc_number = static_cast<uint8_t>(mode_config.cc_data.cc_number);
+                params->center_value = static_cast<uint8_t>(mode_config.cc_data.center_value);
+                params->left_max_pwm = gui::common::uiPercentToDevice(mode_config.cc_data.left_max_pwm);
+                params->right_max_pwm = gui::common::uiPercentToDevice(mode_config.cc_data.right_max_pwm);
+                params->deadband_range = static_cast<uint8_t>(mode_config.cc_data.deadband_range);
                 config.mode_params.type = midi2pwm::pwm::ModeParametersUnion::CCControlModeParams;
-                config.mode_params.value = cc_params.release();
+                config.mode_params.value = params.release();
                 break;
             }
             case 6: {
-                auto pitchbend_params = std::make_unique<midi2pwm::pwm::PitchBendModeParamsT>();
-                pitchbend_params->base_level = gui::common::uiPercentToDevice(mode_config.pitchbend_data.base_level);
-                pitchbend_params->bend_range = gui::common::uiPercentToDevice(mode_config.pitchbend_data.bend_range);
-                pitchbend_params->unipolar = mode_config.pitchbend_data.unipolar;
-                pitchbend_params->velocity_sensitive = mode_config.pitchbend_data.velocity_sensitive;
+                auto params = std::make_unique<midi2pwm::pwm::PitchBendModeParamsT>();
+                params->base_level = gui::common::uiPercentToDevice(mode_config.pitchbend_data.base_level);
+                params->bend_range = gui::common::uiPercentToDevice(mode_config.pitchbend_data.bend_range);
+                params->unipolar = mode_config.pitchbend_data.unipolar;
+                params->velocity_sensitive = mode_config.pitchbend_data.velocity_sensitive;
                 config.mode_params.type = midi2pwm::pwm::ModeParametersUnion::PitchBendModeParams;
-                config.mode_params.value = pitchbend_params.release();
+                config.mode_params.value = params.release();
                 break;
             }
             default:
@@ -590,100 +442,188 @@ int main()
                 break;
         }
 
-        GUI_LOG_INFO("SaveConfig", "Sending config: ch=%u, note=%u, mode=%d",
-                     config.channel_number, config.note, mode_config.mode_type);
-
-        bool success = connection_view_model.sendChannelConfig(config);
-
-        GUI_LOG_INFO("SaveConfig", "Send result: %s", success ? "SUCCESS" : "FAILED");
-
-        if (!success) {
-            app->set_connection_status("Failed to send configuration");
-        } else {
-            app->set_connection_status("Configuration saved");
-        }
-
-        GUI_LOG_INFO("SaveConfig", "Callback completed");
+        commLoop.post(gui::common::CommLoop::SendConfigCmd{std::move(config)});
     });
 
-    app->on_assign_note_clicked([&controller](int channel_idx) {
+    app->on_assign_note_clicked([&isAssigningNote, &channelAwaitingNote](int channel_idx) {
         GUI_LOG_INFO("Assignment", "Entering note assignment mode for channel %d", channel_idx);
-        controller.is_assigning_note.store(true);
-        controller.channel_awaiting_note.store(channel_idx);
+        isAssigningNote.store(true);
+        channelAwaitingNote.store(channel_idx);
     });
 
     app->on_note_assigned_from_backend([app](slint::SharedString note_str) {
-        GUI_LOG_INFO("Assignment", "note_assigned_from_backend callback received: note=%s",
-                     std::string(note_str).c_str());
-
         app->set_temp_note(note_str);
         app->set_temp_is_assigning(false);
         app->set_temp_popup_dirty(true);
-
-        GUI_LOG_DEBUG("Assignment", "Updated temp_note to %s, cleared assignment flag, and marked popup dirty",
-                      std::string(note_str).c_str());
     });
 
-    app->on_popup_closed([&controller]() {
-        if (controller.is_assigning_note.load()) {
-            GUI_LOG_INFO("Assignment", "Popup closed during assignment - canceling assignment mode");
-            controller.is_assigning_note.store(false);
-            controller.channel_awaiting_note.store(-1);
-        }
-    });
-
-    app->on_reset_note_clicked([](int channel_idx) {
-    });
-
-    app->on_assign_cc_clicked([&controller]() {
+    app->on_assign_cc_clicked([&isAssigningCc]() {
         GUI_LOG_INFO("Assignment", "Entering CC assignment mode");
-        controller.is_assigning_cc.store(true);
+        isAssigningCc.store(true);
     });
 
     app->on_cc_assigned_from_backend([app](int cc_number) {
-        GUI_LOG_INFO("Assignment", "cc_assigned_from_backend callback received: CC=%d", cc_number);
-
         auto temp_config = app->get_temp_mode_config();
         temp_config.cc_data.cc_number = cc_number;
         app->set_temp_mode_config(temp_config);
-
         app->set_temp_is_assigning_cc(false);
         app->set_temp_popup_dirty(true);
     });
 
-    app->on_reset_cc_clicked([app]() {
-        GUI_LOG_INFO("Assignment", "Resetting CC assignment");
+    app->on_reset_note_clicked([](int) {});
 
+    app->on_reset_cc_clicked([app]() {
         auto temp_config = app->get_temp_mode_config();
         temp_config.cc_data.cc_number = 0;
         app->set_temp_mode_config(temp_config);
-
         app->set_temp_popup_dirty(true);
     });
 
-    app->on_popup_closed([&controller, app]() {
-        if (controller.is_assigning_note.load()) {
-            GUI_LOG_INFO("Assignment", "Popup closed during note assignment - canceling");
-            controller.is_assigning_note.store(false);
-            controller.channel_awaiting_note.store(-1);
+    app->on_popup_closed([&isAssigningNote, &channelAwaitingNote, &isAssigningCc, app]() {
+        if (isAssigningNote.load()) {
+            isAssigningNote.store(false);
+            channelAwaitingNote.store(-1);
         }
-        if (controller.is_assigning_cc.load()) {
-            GUI_LOG_INFO("Assignment", "Popup closed during CC assignment - canceling");
-            controller.is_assigning_cc.store(false);
+        if (isAssigningCc.load()) {
+            isAssigningCc.store(false);
             app->set_temp_is_assigning_cc(false);
         }
     });
 
     app->set_midi_message("No midi message received yet");
 
-    slint::Timer timer(std::chrono::milliseconds(100), [&connection_view_model]() {
-        connection_view_model.update();
+    uint32_t lastConnVersion = 0;
+    uint32_t lastTelVersion = 0;
+    uint32_t lastMidiVersion = 0;
+    uint32_t lastOtaProgressVersion = 0;
+    std::shared_ptr<slint::VectorModel<ChannelData>> channelModel;
+
+    slint::Timer uiPollTimer(std::chrono::milliseconds(100), [&]() {
+        uint32_t connVer = connectionViewModel.stateVersion();
+        if (connVer != lastConnVersion) {
+            lastConnVersion = connVer;
+            bool alive = connectionViewModel.isPeerAlive();
+
+            if (alive) {
+                app->set_show_connection_screen(false);
+                app->set_waiting_for_device_data(false);
+                app->set_reconnecting_overlay_visible(false);
+                app->set_connection_status("");
+            } else {
+                if (connectionViewModel.isConnected()) {
+                    app->set_reconnecting_overlay_visible(true);
+                } else {
+                    app->set_show_connection_screen(true);
+                    app->set_waiting_for_device_data(false);
+                    app->set_reconnecting_overlay_visible(false);
+                    app->set_connection_status("Connection lost. Select a port to reconnect.");
+                }
+            }
+        }
+
+        uint32_t telVer = channelTelemetryViewModel.version();
+        if (telVer != lastTelVersion) {
+            lastTelVersion = telVer;
+            auto channels = channelTelemetryViewModel.channels();
+
+            if (!channelModel) {
+                channelModel = std::make_shared<slint::VectorModel<ChannelData>>();
+                for (const auto &ch : channels) {
+                    channelModel->push_back(toSlintChannelData(ch));
+                }
+                app->set_channel_model(channelModel);
+            } else {
+                for (std::size_t i = 0; i < channels.size(); ++i) {
+                    channelModel->set_row_data(i, toSlintChannelData(channels[i]));
+                }
+            }
+        }
+
+        uint32_t midiVer = midiViewModel.version();
+        if (midiVer != lastMidiVersion) {
+            lastMidiVersion = midiVer;
+            app->set_midi_message(slint::SharedString(midiViewModel.lastMessage().c_str()));
+
+            auto rawMsg = midiViewModel.lastRawMessage();
+
+            if (isAssigningNote.load()) {
+                bool isNoteMessage = (rawMsg.message_type == midi2pwm::midi::ChannelMessageType::NoteOn ||
+                                      rawMsg.message_type == midi2pwm::midi::ChannelMessageType::NoteOff);
+                if (isNoteMessage && rawMsg.data1 <= 127) {
+                    int channelIdx = channelAwaitingNote.exchange(-1);
+                    isAssigningNote.store(false);
+                    if (channelIdx >= 0) {
+                        std::string noteName = midiNoteToString(static_cast<uint16_t>(rawMsg.data1));
+                        app->invoke_note_assigned_from_backend(slint::SharedString{noteName.c_str()});
+                    }
+                }
+            } else if (isAssigningCc.load()) {
+                bool isCcMessage = (rawMsg.message_type == midi2pwm::midi::ChannelMessageType::ControlChange);
+                if (isCcMessage && rawMsg.data1 <= 127) {
+                    isAssigningCc.store(false);
+                    app->invoke_cc_assigned_from_backend(static_cast<int>(rawMsg.data1));
+                }
+            }
+        }
+
+        uint32_t otaVer = s_otaProgress.version.load(std::memory_order_acquire);
+        if (otaVer != lastOtaProgressVersion) {
+            lastOtaProgressVersion = otaVer;
+
+            midi2pwm::ota::OtaStatus status;
+            uint16_t chunksReceived;
+            uint16_t totalChunks;
+            std::string errorStr;
+            {
+                std::lock_guard<std::mutex> lock(s_otaProgress.mutex);
+                status = s_otaProgress.status;
+                chunksReceived = s_otaProgress.chunksReceived;
+                totalChunks = s_otaProgress.totalChunks;
+                errorStr = s_otaProgress.errorMessage;
+            }
+
+            using Status = midi2pwm::ota::OtaStatus;
+            switch (status) {
+            case Status::Receiving: {
+                float pct = totalChunks > 0
+                    ? (static_cast<float>(chunksReceived) / static_cast<float>(totalChunks)) * 100.0f
+                    : 0.0f;
+                app->set_ota_progress_percent(pct);
+                app->set_ota_status_text(slint::SharedString("Uploading..."));
+                break;
+            }
+            case Status::Applying:
+                app->set_ota_progress_percent(100.0f);
+                app->set_ota_status_text(slint::SharedString("Applying firmware..."));
+                break;
+            case Status::Rebooting:
+                app->set_ota_progress_percent(100.0f);
+                app->set_ota_status_text(slint::SharedString("Rebooting device..."));
+                app->set_ota_is_uploading(false);
+                break;
+            case Status::Idle:
+                app->set_ota_status_text(slint::SharedString("Upload complete"));
+                app->set_ota_is_uploading(false);
+                break;
+            case Status::Error: {
+                std::string msg = "Error: " + errorStr;
+                app->set_ota_status_text(slint::SharedString(msg.c_str()));
+                app->set_ota_is_uploading(false);
+                break;
+            }
+            default:
+                break;
+            }
+        }
     });
 
     app->run();
 
-    GUI_LOG_INFO("Shutdown", "Application window closed, disconnecting from device");
-    connection_view_model.disconnect();
+    GUI_LOG_INFO("Shutdown", "Application window closed, stopping comm thread");
+    commLoop.requestStop();
+    commThread.join();
+
+    connectionViewModel.disconnect();
 
     GUI_LOG_INFO("Shutdown", "Cleanup complete, exiting");
     return 0;
