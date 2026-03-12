@@ -28,6 +28,7 @@ public:
     using OtaDataCallback = etl::delegate<void(const midi2pwm::ota::OtaData &)>;
     using OtaEndCallback = etl::delegate<void(const midi2pwm::ota::OtaEnd &)>;
     using OtaAbortCallback = etl::delegate<void(const midi2pwm::ota::OtaAbort &)>;
+    using UnknownFrameCallback = etl::delegate<bool(const std::uint8_t *, std::size_t)>;
     using WriteCallback = etl::delegate<bool(const std::uint8_t *, std::size_t)>;
 
     MessageProcessor();
@@ -43,6 +44,7 @@ public:
     void setOtaDataCallback(OtaDataCallback callback);
     void setOtaEndCallback(OtaEndCallback callback);
     void setOtaAbortCallback(OtaAbortCallback callback);
+    void setUnknownFrameCallback(UnknownFrameCallback callback);
     void handleFrame(const std::uint8_t *frame, std::size_t size);
 
     bool sendChannelConfig(const midi2pwm::pwm::ChannelConfigT &config);
@@ -84,6 +86,7 @@ private:
     OtaDataCallback otaDataCallback_;
     OtaEndCallback otaEndCallback_;
     OtaAbortCallback otaAbortCallback_;
+    UnknownFrameCallback unknownFrameCallback_;
 };
 
 } // namespace gui::common

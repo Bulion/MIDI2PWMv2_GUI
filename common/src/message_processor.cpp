@@ -119,6 +119,11 @@ void MessageProcessor::setOtaAbortCallback(OtaAbortCallback callback)
     otaAbortCallback_ = callback;
 }
 
+void MessageProcessor::setUnknownFrameCallback(UnknownFrameCallback callback)
+{
+    unknownFrameCallback_ = callback;
+}
+
 bool MessageProcessor::sendChannelConfig(const midi2pwm::pwm::ChannelConfigT &config)
 {
     GUI_LOG_INFO("MessageProcessor", "Building ChannelConfig message: ch=%u, note=%u, mode=%d",
@@ -280,51 +285,58 @@ void MessageProcessor::handleFrame(const std::uint8_t *frame, std::size_t size)
     bool has_ota_identifier = midi2pwm::ota::EnvelopeBufferHasIdentifier(frame);
 
     if (has_ota_identifier) {
-        GUI_LOG_DEBUG("MessageProcessor", "Detected OTA envelope (OTAX identifier at offset 4)");
-
         flatbuffers::Verifier verifier(frame, size);
-        if (midi2pwm::ota::VerifyEnvelopeBuffer(verifier)) {
-            const auto *envelope = midi2pwm::ota::GetEnvelope(frame);
-            if (envelope) {
-                switch (envelope->message_type()) {
-                case midi2pwm::ota::Message::OtaProgress:
-                    if (auto *msg = envelope->message_as_OtaProgress()) {
-                        HandleOtaProgress(*msg);
-                        return;
-                    }
-                    break;
-                case midi2pwm::ota::Message::OtaBegin:
-                    if (auto *msg = envelope->message_as_OtaBegin()) {
-                        HandleOtaBegin(*msg);
-                        return;
-                    }
-                    break;
-                case midi2pwm::ota::Message::OtaData:
-                    if (auto *msg = envelope->message_as_OtaData()) {
-                        HandleOtaData(*msg);
-                        return;
-                    }
-                    break;
-                case midi2pwm::ota::Message::OtaEnd:
-                    if (auto *msg = envelope->message_as_OtaEnd()) {
-                        HandleOtaEnd(*msg);
-                        return;
-                    }
-                    break;
-                case midi2pwm::ota::Message::OtaAbort:
-                    if (auto *msg = envelope->message_as_OtaAbort()) {
-                        HandleOtaAbort(*msg);
-                        return;
-                    }
-                    break;
-                default:
-                    break;
-                }
+        if (!midi2pwm::ota::VerifyEnvelopeBuffer(verifier)) {
+            GUI_LOG_WARNING("MessageProcessor", "OTA envelope verification failed");
+            return;
+        }
+
+        const auto *envelope = midi2pwm::ota::GetEnvelope(frame);
+        if (!envelope) {
+            return;
+        }
+
+        switch (envelope->message_type()) {
+        case midi2pwm::ota::Message::OtaProgress:
+            if (auto *msg = envelope->message_as_OtaProgress()) {
+                HandleOtaProgress(*msg);
+                return;
             }
+            break;
+        case midi2pwm::ota::Message::OtaBegin:
+            if (auto *msg = envelope->message_as_OtaBegin()) {
+                HandleOtaBegin(*msg);
+                return;
+            }
+            break;
+        case midi2pwm::ota::Message::OtaData:
+            if (auto *msg = envelope->message_as_OtaData()) {
+                HandleOtaData(*msg);
+                return;
+            }
+            break;
+        case midi2pwm::ota::Message::OtaEnd:
+            if (auto *msg = envelope->message_as_OtaEnd()) {
+                HandleOtaEnd(*msg);
+                return;
+            }
+            break;
+        case midi2pwm::ota::Message::OtaAbort:
+            if (auto *msg = envelope->message_as_OtaAbort()) {
+                HandleOtaAbort(*msg);
+                return;
+            }
+            break;
+        default:
+            break;
         }
     }
 
     if (!has_midi_identifier && !has_pwm_identifier && !has_ota_identifier) {
+        if (unknownFrameCallback_.is_valid()) {
+            unknownFrameCallback_(frame, size);
+            return;
+        }
         GUI_LOG_WARNING("MessageProcessor", "Message has no recognized file identifier (expected M2PW, PWMX, or OTAX)");
     } else {
         GUI_LOG_WARNING("MessageProcessor", "Message could not be parsed");
