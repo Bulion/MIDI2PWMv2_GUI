@@ -7,7 +7,8 @@ idf_component_register(
         "uart_backend.cpp"
         "log_forwarder.cpp"
         "esp32_flash_writer.cpp"
-    PRIV_REQUIRES driver
+        "psram_buffered_flash_writer.cpp"
+    PRIV_REQUIRES driver app_update esp_timer
     INCLUDE_DIRS
         "."
     REQUIRES

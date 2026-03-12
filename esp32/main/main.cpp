@@ -1,18 +1,23 @@
 #include "app-window.h"
 #include "esp32_flash_writer.h"
 #include "log_forwarder.h"
+#include "psram_buffered_flash_writer.h"
 #include "uart_backend.h"
 #include "waveshare_rgb_lcd_port.h"
 
+#include "gui_common/comm_loop.h"
 #include "gui_common/log.h"
 #include "gui_common/view_models/channel_telemetry_view_model.h"
 #include "gui_common/view_models/connection_view_model.h"
 #include "gui_common/view_models/midi_message_view_model.h"
 
+#include "libcomm/frame_transport.h"
 #include "libcomm/ota_manager.h"
 
 #include <cstdlib>
 #include <esp_log.h>
+#include <esp_system.h>
+#include <esp_timer.h>
 #include <slint-esp.h>
 #include <slint.h>
 #include <span>
@@ -53,180 +58,57 @@ void initializeDisplay()
          .byte_swap = false});
 }
 
-struct Esp32Controller {
-    slint::ComponentHandle<AppWindow> app;
-    ConnectionViewModel &connectionViewModel;
-    MidiMessageViewModel &midiViewModel;
-    std::atomic<bool> isAssigningNote{false};
-    std::atomic<int> channelAwaitingNote{-1};
-    std::atomic<bool> isAssigningCc{false};
-    std::shared_ptr<slint::VectorModel<ChannelData>> channelModel;
-    slint::SharedString lastMidiMessage;
-
-    void OnMidiMessage(const midi2pwm::midi::ChannelMessageT &message)
-    {
-        bool isNoteMessage = (message.message_type == midi2pwm::midi::ChannelMessageType::NoteOn ||
-                              message.message_type == midi2pwm::midi::ChannelMessageType::NoteOff);
-
-        if (isAssigningNote.load()) {
-            if (isNoteMessage && message.data1 <= 127) {
-                int channelIdx = channelAwaitingNote.exchange(-1);
-                isAssigningNote.store(false);
-
-                if (channelIdx >= 0) {
-                    std::string noteName = midiNoteToString(static_cast<uint16_t>(message.data1));
-                    slint::SharedString noteStr{noteName.c_str()};
-
-                    slint::invoke_from_event_loop([handle = app, noteStr]() {
-                        handle->invoke_note_assigned_from_backend(noteStr);
-                    });
-                }
-            }
-        } else if (isAssigningCc.load()) {
-            bool isCcMessage = (message.message_type == midi2pwm::midi::ChannelMessageType::ControlChange);
-
-            if (isCcMessage && message.data1 <= 127) {
-                isAssigningCc.store(false);
-                int ccNumber = static_cast<int>(message.data1);
-
-                slint::invoke_from_event_loop([handle = app, ccNumber]() {
-                    handle->invoke_cc_assigned_from_backend(ccNumber);
-                });
-            }
-        }
-
-        midiViewModel.updateFromChannelMessage(message);
-    }
-
-    void OnMessage(const MidiMessageViewModel::MessageString &text)
-    {
-        slint::SharedString shared{text.c_str()};
-        if (shared == lastMidiMessage) {
-            return;
-        }
-        lastMidiMessage = shared;
-        slint::invoke_from_event_loop([handle = app, shared]() {
-            handle->set_midi_message(shared);
-        });
-    }
-
-    static ChannelData toSlintChannelData(const gui::common::ChannelData &channelData)
-    {
-        ChannelData slintChannelData;
-        slintChannelData.note = slint::SharedString(channelData.note.c_str());
-        slintChannelData.voltage = channelData.voltage;
-        slintChannelData.current = channelData.currentMa;
-        slintChannelData.duty_cycle = channelData.dutyCyclePercent;
-        slintChannelData.is_active = channelData.isActive;
-        slintChannelData.fault = slint::SharedString(channelData.fault.c_str());
-        slintChannelData.mode_type = channelData.mode_type;
-        slintChannelData.instant_data.on_level = channelData.instant_data.on_level;
-        slintChannelData.instant_data.velocity_sensitive = channelData.instant_data.velocity_sensitive;
-        slintChannelData.ramped_data.on_level = channelData.ramped_data.on_level;
-        slintChannelData.ramped_data.velocity_sensitive = channelData.ramped_data.velocity_sensitive;
-        slintChannelData.ramped_data.attack_time_ms = channelData.ramped_data.attack_time_ms;
-        slintChannelData.ramped_data.release_time_ms = channelData.ramped_data.release_time_ms;
-        slintChannelData.pulse_data.on_level = channelData.pulse_data.on_level;
-        slintChannelData.pulse_data.velocity_sensitive = channelData.pulse_data.velocity_sensitive;
-        slintChannelData.pulse_data.attack_time_ms = channelData.pulse_data.attack_time_ms;
-        slintChannelData.pulse_data.hold_time_ms = channelData.pulse_data.hold_time_ms;
-        slintChannelData.pulse_data.release_time_ms = channelData.pulse_data.release_time_ms;
-        slintChannelData.toggle_data.on_level = channelData.toggle_data.on_level;
-        slintChannelData.toggle_data.velocity_sensitive = channelData.toggle_data.velocity_sensitive;
-        slintChannelData.toggle_data.debounce_delay_ms = channelData.toggle_data.debounce_delay_ms;
-        slintChannelData.adsr_data.attack_level = channelData.adsr_data.attack_level;
-        slintChannelData.adsr_data.sustain_level = channelData.adsr_data.sustain_level;
-        slintChannelData.adsr_data.velocity_sensitive = channelData.adsr_data.velocity_sensitive;
-        slintChannelData.adsr_data.attack_time_ms = channelData.adsr_data.attack_time_ms;
-        slintChannelData.adsr_data.decay_time_ms = channelData.adsr_data.decay_time_ms;
-        slintChannelData.adsr_data.release_time_ms = channelData.adsr_data.release_time_ms;
-        slintChannelData.cc_data.cc_number = channelData.cc_data.cc_number;
-        slintChannelData.cc_data.center_value = channelData.cc_data.center_value;
-        slintChannelData.cc_data.left_max_pwm = channelData.cc_data.left_max_pwm;
-        slintChannelData.cc_data.right_max_pwm = channelData.cc_data.right_max_pwm;
-        slintChannelData.cc_data.deadband_range = channelData.cc_data.deadband_range;
-        slintChannelData.pitchbend_data.base_level = channelData.pitchbend_data.base_level;
-        slintChannelData.pitchbend_data.bend_range = channelData.pitchbend_data.bend_range;
-        slintChannelData.pitchbend_data.unipolar = channelData.pitchbend_data.unipolar;
-        slintChannelData.pitchbend_data.velocity_sensitive = channelData.pitchbend_data.velocity_sensitive;
-        return slintChannelData;
-    }
-
-    void OnChannelTelemetry(const ChannelTelemetryViewModel::ChannelsArray &channels)
-    {
-        slint::invoke_from_event_loop([this, handle = app, channels]() {
-            if (!channelModel) {
-                channelModel = std::make_shared<slint::VectorModel<ChannelData>>();
-                for (const auto &channelData : channels) {
-                    channelModel->push_back(toSlintChannelData(channelData));
-                }
-                handle->set_channel_model(channelModel);
-                return;
-            }
-
-            for (std::size_t i = 0; i < channels.size(); ++i) {
-                channelModel->set_row_data(i, toSlintChannelData(channels[i]));
-            }
-        });
-    }
-
-    void OnConnectionChanged(bool peerAlive) const
-    {
-        GUI_LOG_INFO(TAG, "Connection state changed: %s", peerAlive ? "PEER_ALIVE" : "PEER_LOST");
-
-        if (!peerAlive) {
-            slint::invoke_from_event_loop([handle = app]() {
-                handle->set_reconnecting_overlay_visible(true);
-            });
-
-            if (!connectionViewModel.isConnected()) {
-                GUI_LOG_INFO(TAG, "Backend disconnected, auto-reconnecting...");
-                connectionViewModel.connect("UART0");
-            }
-            return;
-        }
-
-        slint::invoke_from_event_loop([handle = app]() {
-            handle->set_show_connection_screen(false);
-            handle->set_waiting_for_device_data(false);
-            handle->set_reconnecting_overlay_visible(false);
-            handle->set_connection_status("");
-        });
-    }
-
-    static std::string midiNoteToString(uint16_t noteNumber)
-    {
-        static const char *NOTE_NAMES[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
-        int octave = (noteNumber / 12) - 1;
-        int noteIdx = noteNumber % 12;
-        return std::string(NOTE_NAMES[noteIdx]) + std::to_string(octave);
-    }
-};
-
-static Esp32FlashWriter s_esp32FlashWriter;
-static gui::common::ConnectionViewModel *s_otaConnectionVm = nullptr;
-
-static void otaSendProgress(midi2pwm::ota::Target target, midi2pwm::ota::OtaStatus status,
-                            std::uint16_t chunksReceived, std::uint16_t totalChunks,
-                            const char *errorMessage)
+ChannelData toSlintChannelData(const gui::common::ChannelData &channelData)
 {
-    if (s_otaConnectionVm) {
-        s_otaConnectionVm->messageProcessor().sendOtaProgress(
-            target, status, chunksReceived, totalChunks, errorMessage);
-    }
+    ChannelData slintChannelData;
+    slintChannelData.note = slint::SharedString(channelData.note.c_str());
+    slintChannelData.voltage = channelData.voltage;
+    slintChannelData.current = channelData.currentMa;
+    slintChannelData.duty_cycle = channelData.dutyCyclePercent;
+    slintChannelData.is_active = channelData.isActive;
+    slintChannelData.fault = slint::SharedString(channelData.fault.c_str());
+    slintChannelData.mode_type = channelData.mode_type;
+    slintChannelData.instant_data.on_level = channelData.instant_data.on_level;
+    slintChannelData.instant_data.velocity_sensitive = channelData.instant_data.velocity_sensitive;
+    slintChannelData.ramped_data.on_level = channelData.ramped_data.on_level;
+    slintChannelData.ramped_data.velocity_sensitive = channelData.ramped_data.velocity_sensitive;
+    slintChannelData.ramped_data.attack_time_ms = channelData.ramped_data.attack_time_ms;
+    slintChannelData.ramped_data.release_time_ms = channelData.ramped_data.release_time_ms;
+    slintChannelData.pulse_data.on_level = channelData.pulse_data.on_level;
+    slintChannelData.pulse_data.velocity_sensitive = channelData.pulse_data.velocity_sensitive;
+    slintChannelData.pulse_data.attack_time_ms = channelData.pulse_data.attack_time_ms;
+    slintChannelData.pulse_data.hold_time_ms = channelData.pulse_data.hold_time_ms;
+    slintChannelData.pulse_data.release_time_ms = channelData.pulse_data.release_time_ms;
+    slintChannelData.toggle_data.on_level = channelData.toggle_data.on_level;
+    slintChannelData.toggle_data.velocity_sensitive = channelData.toggle_data.velocity_sensitive;
+    slintChannelData.toggle_data.debounce_delay_ms = channelData.toggle_data.debounce_delay_ms;
+    slintChannelData.adsr_data.attack_level = channelData.adsr_data.attack_level;
+    slintChannelData.adsr_data.sustain_level = channelData.adsr_data.sustain_level;
+    slintChannelData.adsr_data.velocity_sensitive = channelData.adsr_data.velocity_sensitive;
+    slintChannelData.adsr_data.attack_time_ms = channelData.adsr_data.attack_time_ms;
+    slintChannelData.adsr_data.decay_time_ms = channelData.adsr_data.decay_time_ms;
+    slintChannelData.adsr_data.release_time_ms = channelData.adsr_data.release_time_ms;
+    slintChannelData.cc_data.cc_number = channelData.cc_data.cc_number;
+    slintChannelData.cc_data.center_value = channelData.cc_data.center_value;
+    slintChannelData.cc_data.left_max_pwm = channelData.cc_data.left_max_pwm;
+    slintChannelData.cc_data.right_max_pwm = channelData.cc_data.right_max_pwm;
+    slintChannelData.cc_data.deadband_range = channelData.cc_data.deadband_range;
+    slintChannelData.pitchbend_data.base_level = channelData.pitchbend_data.base_level;
+    slintChannelData.pitchbend_data.bend_range = channelData.pitchbend_data.bend_range;
+    slintChannelData.pitchbend_data.unipolar = channelData.pitchbend_data.unipolar;
+    slintChannelData.pitchbend_data.velocity_sensitive = channelData.pitchbend_data.velocity_sensitive;
+    return slintChannelData;
 }
 
-static libcomm::OtaManager s_otaManager(
-    s_esp32FlashWriter,
-    midi2pwm::ota::Target::Esp32,
-    libcomm::OtaManager::SendProgressCallback::create<&otaSendProgress>());
+std::string midiNoteToString(uint16_t noteNumber)
+{
+    static const char *NOTE_NAMES[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+    int octave = (noteNumber / 12) - 1;
+    int noteIdx = noteNumber % 12;
+    return std::string(NOTE_NAMES[noteIdx]) + std::to_string(octave);
+}
 
-static void onOtaBegin(const midi2pwm::ota::OtaBegin &msg) { s_otaManager.handleBegin(msg); }
-static void onOtaData(const midi2pwm::ota::OtaData &msg) { s_otaManager.handleData(msg); }
-static void onOtaEnd(const midi2pwm::ota::OtaEnd &msg) { s_otaManager.handleEnd(msg); }
-static void onOtaAbort(const midi2pwm::ota::OtaAbort &msg) { s_otaManager.handleAbort(msg); }
-
-static uint16_t parseNoteString(const std::string &noteStr)
+uint16_t parseNoteString(const std::string &noteStr)
 {
     if (noteStr.empty() || noteStr == "---") {
         return 255;
@@ -265,6 +147,115 @@ static uint16_t parseNoteString(const std::string &noteStr)
     return static_cast<uint16_t>(midiNote);
 }
 
+static Esp32FlashWriter s_esp32FlashWriterDelegate;
+static PsramBufferedFlashWriter s_psramFlashWriter(s_esp32FlashWriterDelegate);
+static gui::common::ConnectionViewModel *s_otaConnectionVm = nullptr;
+static gui::esp32::UartBackend *s_echoBackend = nullptr;
+
+static bool echoWrite(const std::uint8_t *data, std::size_t size)
+{
+    return s_echoBackend ? s_echoBackend->write(data, size) : false;
+}
+
+static libcomm::FrameTransport s_echoTransport(
+    libcomm::FrameTransport::WriteCallback::create<&echoWrite>());
+
+static bool echoFrame(const std::uint8_t *data, std::size_t size)
+{
+    return s_echoTransport.Send(data, size);
+}
+
+static void otaSendProgress(midi2pwm::ota::Target target, midi2pwm::ota::OtaStatus status,
+                            std::uint16_t chunksReceived, std::uint16_t totalChunks,
+                            const char *errorMessage)
+{
+    if (s_otaConnectionVm) {
+        s_otaConnectionVm->messageProcessor().sendOtaProgress(
+            target, status, chunksReceived, totalChunks, errorMessage);
+    }
+}
+
+static libcomm::OtaManager s_otaManager(
+    s_psramFlashWriter,
+    midi2pwm::ota::Target::Esp32,
+    libcomm::OtaManager::SendProgressCallback::create<&otaSendProgress>());
+
+static constexpr uint32_t OTA_DATA_TIMEOUT_MS = 30000;
+static std::atomic<int64_t> s_lastOtaActivityUs{0};
+
+static void otaTouchActivity()
+{
+    s_lastOtaActivityUs.store(esp_timer_get_time(), std::memory_order_release);
+}
+
+static void onOtaBegin(const midi2pwm::ota::OtaBegin &msg)
+{
+    otaTouchActivity();
+    s_psramFlashWriter.setCompressedTransfer(
+        msg.compressed_size(), msg.compressed_crc32(), msg.firmware_size());
+    s_otaManager.handleBegin(msg);
+}
+
+static void onOtaData(const midi2pwm::ota::OtaData &msg)
+{
+    otaTouchActivity();
+    s_otaManager.handleData(msg);
+}
+
+static void otaEndTask(void *)
+{
+    s_otaManager.handleEnd();
+    if (s_otaManager.status() == midi2pwm::ota::OtaStatus::Rebooting) {
+        uart_wait_tx_done(UART_NUM_0, pdMS_TO_TICKS(2000));
+        esp_restart();
+    }
+    vTaskDelete(nullptr);
+}
+
+static void onOtaEnd(const midi2pwm::ota::OtaEnd &)
+{
+    otaTouchActivity();
+    xTaskCreatePinnedToCore(otaEndTask, "ota_end", 8192, nullptr, 3, nullptr, 1);
+}
+
+static void onOtaAbort(const midi2pwm::ota::OtaAbort &msg)
+{
+    s_otaManager.handleAbort(msg);
+    s_lastOtaActivityUs.store(0, std::memory_order_release);
+}
+
+static void checkOtaDataTimeout()
+{
+    auto status = s_otaManager.status();
+    if (status != midi2pwm::ota::OtaStatus::Receiving) {
+        return;
+    }
+
+    int64_t lastActivity = s_lastOtaActivityUs.load(std::memory_order_acquire);
+    if (lastActivity == 0) {
+        return;
+    }
+
+    int64_t nowUs = esp_timer_get_time();
+    int64_t elapsedMs = (nowUs - lastActivity) / 1000;
+    if (elapsedMs > OTA_DATA_TIMEOUT_MS) {
+        GUI_LOG_ERROR(TAG, "OTA data timeout after %lld ms", static_cast<long long>(elapsedMs));
+        s_otaManager.handleAbort("Data reception timeout");
+        s_lastOtaActivityUs.store(0, std::memory_order_release);
+    }
+}
+
+static void commTaskFn(void *param)
+{
+    auto *loop = static_cast<gui::common::CommLoop *>(param);
+    while (!loop->shouldStop()) {
+        loop->runOnce();
+        checkOtaDataTimeout();
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
+    vTaskDelete(nullptr);
+}
+
 } // namespace
 
 extern "C" void app_main(void)
@@ -286,20 +277,15 @@ extern "C" void app_main(void)
 
     ConnectionViewModel connectionViewModel{backend, midiViewModel, channelTelemetryViewModel};
 
-    Esp32Controller controller{app, connectionViewModel, midiViewModel};
-
-    midiViewModel.setUpdateCallback(
-        MidiMessageViewModel::UpdateCallback::create<Esp32Controller, &Esp32Controller::OnMessage>(controller));
-    channelTelemetryViewModel.setUpdateCallback(
-        ChannelTelemetryViewModel::UpdateCallback::create<Esp32Controller, &Esp32Controller::OnChannelTelemetry>(controller));
-    connectionViewModel.setConnectionChangedCallback(
-        ConnectionViewModel::ConnectionChangedCallback::create<Esp32Controller, &Esp32Controller::OnConnectionChanged>(controller));
-    connectionViewModel.setRawMidiMessageCallback(
-        ConnectionViewModel::RawMidiMessageCallback::create<Esp32Controller, &Esp32Controller::OnMidiMessage>(controller));
+    gui::common::CommLoop commLoop(connectionViewModel);
 
     s_otaConnectionVm = &connectionViewModel;
+    s_echoBackend = &backend;
 
     auto &msgProc = connectionViewModel.messageProcessor();
+    msgProc.setUnknownFrameCallback(
+        gui::common::MessageProcessor::UnknownFrameCallback::create<&echoFrame>());
+
     msgProc.setOtaBeginCallback(
         gui::common::MessageProcessor::OtaBeginCallback::create<&onOtaBegin>());
     msgProc.setOtaDataCallback(
@@ -309,11 +295,17 @@ extern "C" void app_main(void)
     msgProc.setOtaAbortCallback(
         gui::common::MessageProcessor::OtaAbortCallback::create<&onOtaAbort>());
 
+    xTaskCreatePinnedToCore(commTaskFn, "comm", 4096, &commLoop, 4, nullptr, 0);
+
     if (!connectionViewModel.connect("UART0")) {
         GUI_LOG_ERROR(TAG, "Failed to connect via UART backend");
     }
 
-    app->on_save_channel_config([&connectionViewModel, app](int channelIdx, slint::SharedString noteStr, ModeConfig modeConfig) {
+    std::atomic<bool> isAssigningNote{false};
+    std::atomic<int> channelAwaitingNote{-1};
+    std::atomic<bool> isAssigningCc{false};
+
+    app->on_save_channel_config([&commLoop](int channelIdx, slint::SharedString noteStr, ModeConfig modeConfig) {
         uint16_t noteNumber = 255;
         if (!noteStr.empty()) {
             noteNumber = parseNoteString(std::string{noteStr});
@@ -405,15 +397,12 @@ extern "C" void app_main(void)
                 break;
         }
 
-        bool success = connectionViewModel.sendChannelConfig(config);
-        if (!success) {
-            GUI_LOG_ERROR(TAG, "Failed to send channel config for channel %d", channelIdx);
-        }
+        commLoop.post(gui::common::CommLoop::SendConfigCmd{std::move(config)});
     });
 
-    app->on_assign_note_clicked([&controller](int channelIdx) {
-        controller.isAssigningNote.store(true);
-        controller.channelAwaitingNote.store(channelIdx);
+    app->on_assign_note_clicked([&isAssigningNote, &channelAwaitingNote](int channelIdx) {
+        isAssigningNote.store(true);
+        channelAwaitingNote.store(channelIdx);
     });
 
     app->on_note_assigned_from_backend([app](slint::SharedString noteStr) {
@@ -422,8 +411,8 @@ extern "C" void app_main(void)
         app->set_temp_popup_dirty(true);
     });
 
-    app->on_assign_cc_clicked([&controller]() {
-        controller.isAssigningCc.store(true);
+    app->on_assign_cc_clicked([&isAssigningCc]() {
+        isAssigningCc.store(true);
     });
 
     app->on_cc_assigned_from_backend([app](int ccNumber) {
@@ -442,13 +431,13 @@ extern "C" void app_main(void)
         app->set_temp_popup_dirty(true);
     });
 
-    app->on_popup_closed([&controller, app]() {
-        if (controller.isAssigningNote.load()) {
-            controller.isAssigningNote.store(false);
-            controller.channelAwaitingNote.store(-1);
+    app->on_popup_closed([&isAssigningNote, &channelAwaitingNote, &isAssigningCc, app]() {
+        if (isAssigningNote.load()) {
+            isAssigningNote.store(false);
+            channelAwaitingNote.store(-1);
         }
-        if (controller.isAssigningCc.load()) {
-            controller.isAssigningCc.store(false);
+        if (isAssigningCc.load()) {
+            isAssigningCc.store(false);
             app->set_temp_is_assigning_cc(false);
         }
     });
@@ -460,8 +449,75 @@ extern "C" void app_main(void)
     app->set_waiting_for_device_data(true);
     app->set_midi_message("No midi message received yet");
 
-    slint::Timer updateTimer(std::chrono::milliseconds(100), [&connectionViewModel]() {
-        connectionViewModel.update();
+    uint32_t lastConnVersion = 0;
+    uint32_t lastTelVersion = 0;
+    uint32_t lastMidiVersion = 0;
+    std::shared_ptr<slint::VectorModel<ChannelData>> channelModel;
+
+    slint::Timer uiPollTimer(std::chrono::milliseconds(100), [&]() {
+        uint32_t connVer = connectionViewModel.stateVersion();
+        if (connVer != lastConnVersion) {
+            lastConnVersion = connVer;
+            bool alive = connectionViewModel.isPeerAlive();
+
+            if (alive) {
+                app->set_show_connection_screen(false);
+                app->set_waiting_for_device_data(false);
+                app->set_reconnecting_overlay_visible(false);
+                app->set_connection_status("");
+            } else {
+                app->set_reconnecting_overlay_visible(true);
+                if (!connectionViewModel.isConnected()) {
+                    GUI_LOG_INFO(TAG, "Backend disconnected, auto-reconnecting...");
+                    commLoop.post(gui::common::CommLoop::ConnectCmd{"UART0"});
+                }
+            }
+        }
+
+        uint32_t telVer = channelTelemetryViewModel.version();
+        if (telVer != lastTelVersion) {
+            lastTelVersion = telVer;
+            auto channels = channelTelemetryViewModel.channels();
+
+            if (!channelModel) {
+                channelModel = std::make_shared<slint::VectorModel<ChannelData>>();
+                for (const auto &ch : channels) {
+                    channelModel->push_back(toSlintChannelData(ch));
+                }
+                app->set_channel_model(channelModel);
+            } else {
+                for (std::size_t i = 0; i < channels.size(); ++i) {
+                    channelModel->set_row_data(i, toSlintChannelData(channels[i]));
+                }
+            }
+        }
+
+        uint32_t midiVer = midiViewModel.version();
+        if (midiVer != lastMidiVersion) {
+            lastMidiVersion = midiVer;
+            app->set_midi_message(slint::SharedString(midiViewModel.lastMessage().c_str()));
+
+            auto rawMsg = midiViewModel.lastRawMessage();
+
+            if (isAssigningNote.load()) {
+                bool isNoteMessage = (rawMsg.message_type == midi2pwm::midi::ChannelMessageType::NoteOn ||
+                                      rawMsg.message_type == midi2pwm::midi::ChannelMessageType::NoteOff);
+                if (isNoteMessage && rawMsg.data1 <= 127) {
+                    int channelIdx = channelAwaitingNote.exchange(-1);
+                    isAssigningNote.store(false);
+                    if (channelIdx >= 0) {
+                        std::string noteName = midiNoteToString(static_cast<uint16_t>(rawMsg.data1));
+                        app->invoke_note_assigned_from_backend(slint::SharedString{noteName.c_str()});
+                    }
+                }
+            } else if (isAssigningCc.load()) {
+                bool isCcMessage = (rawMsg.message_type == midi2pwm::midi::ChannelMessageType::ControlChange);
+                if (isCcMessage && rawMsg.data1 <= 127) {
+                    isAssigningCc.store(false);
+                    app->invoke_cc_assigned_from_backend(static_cast<int>(rawMsg.data1));
+                }
+            }
+        }
     });
 
     app->run();
