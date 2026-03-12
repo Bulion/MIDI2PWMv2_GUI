@@ -1,4 +1,5 @@
 add_library(gui_common STATIC
+    src/comm_loop.cpp
     src/message_processor.cpp
     src/view_models/channel_telemetry_view_model.cpp
     src/view_models/connection_view_model.cpp
