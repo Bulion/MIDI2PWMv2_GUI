@@ -29,6 +29,9 @@
 /web/dist/
 /web/generated/
 
+# Clangd cache
+.cache/
+
 # IDE and tooling metadata
 /.idea/
 .vscode/
