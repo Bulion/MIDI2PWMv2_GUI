@@ -14,10 +14,13 @@
 #include "libcomm/frame_transport.h"
 #include "libcomm/ota_manager.h"
 
+#include <atomic>
+#include <cstdio>
 #include <cstdlib>
 #include <esp_log.h>
 #include <esp_system.h>
 #include <esp_timer.h>
+#include <mutex>
 #include <slint-esp.h>
 #include <slint.h>
 #include <span>
@@ -165,10 +168,30 @@ static bool echoFrame(const std::uint8_t *data, std::size_t size)
     return s_echoTransport.Send(data, size);
 }
 
+struct OtaDisplayState {
+    std::atomic<uint32_t> version{0};
+    std::mutex mutex;
+    midi2pwm::ota::OtaStatus status{midi2pwm::ota::OtaStatus::Idle};
+    uint16_t chunksReceived{0};
+    uint16_t totalChunks{0};
+    uint32_t compressedSize{0};
+    uint32_t firmwareSize{0};
+};
+
+static OtaDisplayState s_otaDisplay;
+
 static void otaSendProgress(midi2pwm::ota::Target target, midi2pwm::ota::OtaStatus status,
                             std::uint16_t chunksReceived, std::uint16_t totalChunks,
                             const char *errorMessage)
 {
+    {
+        std::lock_guard lock(s_otaDisplay.mutex);
+        s_otaDisplay.status = status;
+        s_otaDisplay.chunksReceived = chunksReceived;
+        s_otaDisplay.totalChunks = totalChunks;
+    }
+    s_otaDisplay.version.fetch_add(1, std::memory_order_release);
+
     if (s_otaConnectionVm) {
         s_otaConnectionVm->messageProcessor().sendOtaProgress(
             target, status, chunksReceived, totalChunks, errorMessage);
@@ -191,6 +214,12 @@ static void otaTouchActivity()
 static void onOtaBegin(const midi2pwm::ota::OtaBegin &msg)
 {
     otaTouchActivity();
+    {
+        std::lock_guard lock(s_otaDisplay.mutex);
+        s_otaDisplay.compressedSize = msg.compressed_size();
+        s_otaDisplay.firmwareSize = msg.firmware_size();
+        s_otaDisplay.totalChunks = msg.total_chunks();
+    }
     s_psramFlashWriter.setCompressedTransfer(
         msg.compressed_size(), msg.compressed_crc32(), msg.firmware_size());
     s_otaManager.handleBegin(msg);
@@ -200,6 +229,8 @@ static void onOtaData(const midi2pwm::ota::OtaData &msg)
 {
     otaTouchActivity();
     s_otaManager.handleData(msg);
+    s_otaDisplay.chunksReceived = msg.chunk_index() + 1;
+    s_otaDisplay.version.fetch_add(1, std::memory_order_release);
 }
 
 static void otaEndTask(void *)
@@ -222,6 +253,11 @@ static void onOtaAbort(const midi2pwm::ota::OtaAbort &msg)
 {
     s_otaManager.handleAbort(msg);
     s_lastOtaActivityUs.store(0, std::memory_order_release);
+    {
+        std::lock_guard lock(s_otaDisplay.mutex);
+        s_otaDisplay.status = midi2pwm::ota::OtaStatus::Error;
+    }
+    s_otaDisplay.version.fetch_add(1, std::memory_order_release);
 }
 
 static void checkOtaDataTimeout()
@@ -452,6 +488,9 @@ extern "C" void app_main(void)
     uint32_t lastConnVersion = 0;
     uint32_t lastTelVersion = 0;
     uint32_t lastMidiVersion = 0;
+    int64_t lastOtaUpdateUs = 0;
+    int64_t otaErrorShownAtUs = 0;
+    uint32_t lastOtaDisplayVersion = 0;
     std::shared_ptr<slint::VectorModel<ChannelData>> channelModel;
 
     slint::Timer uiPollTimer(std::chrono::milliseconds(100), [&]() {
@@ -516,6 +555,94 @@ extern "C" void app_main(void)
                     isAssigningCc.store(false);
                     app->invoke_cc_assigned_from_backend(static_cast<int>(rawMsg.data1));
                 }
+            }
+        }
+
+        constexpr int64_t OTA_POLL_INTERVAL_US = 500'000;
+        constexpr int64_t OTA_ERROR_DISPLAY_US = 5'000'000;
+
+        int64_t nowUs = esp_timer_get_time();
+        uint32_t otaVer = s_otaDisplay.version.load(std::memory_order_acquire);
+        bool otaVersionChanged = otaVer != lastOtaDisplayVersion;
+        bool otaPollDue = (nowUs - lastOtaUpdateUs) >= OTA_POLL_INTERVAL_US;
+        bool otaNeedsUpdate = otaVersionChanged && (otaPollDue || s_otaDisplay.status != midi2pwm::ota::OtaStatus::Receiving);
+
+        if (otaNeedsUpdate) {
+            lastOtaDisplayVersion = otaVer;
+            lastOtaUpdateUs = nowUs;
+
+            midi2pwm::ota::OtaStatus otaStatus;
+            uint16_t chunks = 0;
+            uint16_t total = 0;
+            uint32_t compressedSize = 0;
+            {
+                std::lock_guard lock(s_otaDisplay.mutex);
+                otaStatus = s_otaDisplay.status;
+                chunks = s_otaDisplay.chunksReceived;
+                total = s_otaDisplay.totalChunks;
+                compressedSize = s_otaDisplay.compressedSize;
+            }
+
+            bool showScreen = (otaStatus != midi2pwm::ota::OtaStatus::Idle);
+            app->set_ota_screen_visible(showScreen);
+
+            if (showScreen) {
+                app->set_ota_screen_status(static_cast<int>(otaStatus));
+
+                using Status = midi2pwm::ota::OtaStatus;
+                switch (otaStatus) {
+                case Status::Preparing:
+                    app->set_ota_screen_phase_text(slint::SharedString("Preparing..."));
+                    app->set_ota_screen_detail_text(slint::SharedString("Allocating PSRAM buffer"));
+                    app->set_ota_screen_progress(0);
+                    break;
+                case Status::Receiving: {
+                    float pct = total > 0 ? 100.f * chunks / total : 0.f;
+                    uint32_t kbReceived = static_cast<uint32_t>(chunks);
+                    uint32_t kbTotal = compressedSize / 1024;
+                    char detail[32];
+                    std::snprintf(detail, sizeof(detail), "%lu / %lu KB",
+                                  static_cast<unsigned long>(kbReceived),
+                                  static_cast<unsigned long>(kbTotal));
+                    app->set_ota_screen_phase_text(slint::SharedString("Downloading firmware..."));
+                    app->set_ota_screen_detail_text(slint::SharedString(detail));
+                    app->set_ota_screen_progress(pct);
+                    break;
+                }
+                case Status::Verifying:
+                    app->set_ota_screen_phase_text(slint::SharedString("Verifying firmware..."));
+                    app->set_ota_screen_detail_text(slint::SharedString(""));
+                    app->set_ota_screen_progress(100);
+                    break;
+                case Status::Applying:
+                    app->set_ota_screen_phase_text(slint::SharedString("Writing to flash..."));
+                    app->set_ota_screen_detail_text(slint::SharedString(""));
+                    app->set_ota_screen_progress(100);
+                    break;
+                case Status::Rebooting:
+                    app->set_ota_screen_phase_text(slint::SharedString("Rebooting..."));
+                    app->set_ota_screen_detail_text(slint::SharedString(""));
+                    app->set_ota_screen_progress(100);
+                    break;
+                case Status::Error:
+                    app->set_ota_screen_phase_text(slint::SharedString("Update failed"));
+                    app->set_ota_screen_error(slint::SharedString(""));
+                    otaErrorShownAtUs = nowUs;
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+
+        if (app->get_ota_screen_visible() && app->get_ota_screen_status() == static_cast<int>(midi2pwm::ota::OtaStatus::Error)) {
+            if (otaErrorShownAtUs > 0 && (nowUs - otaErrorShownAtUs) > OTA_ERROR_DISPLAY_US) {
+                app->set_ota_screen_visible(false);
+                {
+                    std::lock_guard lock(s_otaDisplay.mutex);
+                    s_otaDisplay.status = midi2pwm::ota::OtaStatus::Idle;
+                }
+                otaErrorShownAtUs = 0;
             }
         }
     });
