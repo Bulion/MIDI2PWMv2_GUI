@@ -99,6 +99,7 @@ bool ConnectionViewModel::connect(const std::string &portIdentifier)
         lastHeartbeatSentMs_ = getTimeMs();
     }
 
+    stateVersion_.fetch_add(1, std::memory_order_release);
     GUI_LOG_INFO("ConnectionVM", "Backend connected, epoch=%u", localEpoch_);
     return true;
 }
@@ -118,6 +119,12 @@ bool ConnectionViewModel::isPeerAlive() const
 {
     std::lock_guard<std::mutex> stateLock(viewModelStateMutex_);
     return peerState_ == PeerState::Alive;
+}
+
+ConnectionViewModel::PeerState ConnectionViewModel::peerState() const
+{
+    std::lock_guard<std::mutex> stateLock(viewModelStateMutex_);
+    return peerState_;
 }
 
 const std::vector<PortInfo> &ConnectionViewModel::ports() const
@@ -167,6 +174,8 @@ void ConnectionViewModel::handleBackendDisconnected()
         peerEpochKnown_ = false;
     }
 
+    stateVersion_.fetch_add(1, std::memory_order_release);
+
     midiMessageViewModelReference_.clear();
     channelTelemetryViewModelReference_.clear();
 
@@ -199,8 +208,11 @@ void ConnectionViewModel::handleMidiChannelMessageReceived(const midi2pwm::midi:
         }
     }
 
-    if (shouldNotifyConnected && connectionStateChangedCallback_.is_valid()) {
-        connectionStateChangedCallback_(true);
+    if (shouldNotifyConnected) {
+        stateVersion_.fetch_add(1, std::memory_order_release);
+        if (connectionStateChangedCallback_.is_valid()) {
+            connectionStateChangedCallback_(true);
+        }
     }
 }
 
@@ -220,8 +232,11 @@ void ConnectionViewModel::handlePwmTelemetryReceived(const midi2pwm::pwm::Channe
         }
     }
 
-    if (shouldNotifyConnected && connectionStateChangedCallback_.is_valid()) {
-        connectionStateChangedCallback_(true);
+    if (shouldNotifyConnected) {
+        stateVersion_.fetch_add(1, std::memory_order_release);
+        if (connectionStateChangedCallback_.is_valid()) {
+            connectionStateChangedCallback_(true);
+        }
     }
 }
 
@@ -241,8 +256,11 @@ void ConnectionViewModel::handleChannelConfigReceived(const midi2pwm::pwm::Chann
         }
     }
 
-    if (shouldNotifyConnected && connectionStateChangedCallback_.is_valid()) {
-        connectionStateChangedCallback_(true);
+    if (shouldNotifyConnected) {
+        stateVersion_.fetch_add(1, std::memory_order_release);
+        if (connectionStateChangedCallback_.is_valid()) {
+            connectionStateChangedCallback_(true);
+        }
     }
 }
 
@@ -284,8 +302,11 @@ void ConnectionViewModel::handleHeartBeatReceived(const midi2pwm::pwm::HeartBeat
         channelTelemetryViewModelReference_.clear();
     }
 
-    if (shouldNotifyConnected && connectionStateChangedCallback_.is_valid()) {
-        connectionStateChangedCallback_(true);
+    if (shouldNotifyConnected) {
+        stateVersion_.fetch_add(1, std::memory_order_release);
+        if (connectionStateChangedCallback_.is_valid()) {
+            connectionStateChangedCallback_(true);
+        }
     }
 }
 
@@ -350,8 +371,11 @@ void ConnectionViewModel::update()
         }
     }
 
-    if (shouldNotifyDisconnected && connectionStateChangedCallback_.is_valid()) {
-        connectionStateChangedCallback_(false);
+    if (shouldNotifyDisconnected) {
+        stateVersion_.fetch_add(1, std::memory_order_release);
+        if (connectionStateChangedCallback_.is_valid()) {
+            connectionStateChangedCallback_(false);
+        }
     }
 
     if (pendingTelemetryRequest_.exchange(false)) {

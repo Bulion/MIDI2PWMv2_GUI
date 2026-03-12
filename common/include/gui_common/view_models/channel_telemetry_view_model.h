@@ -3,6 +3,7 @@
 #include "pwm_messages_generated.h"
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <mutex>
 #include <string>
@@ -113,6 +114,7 @@ public:
     void clear();
 
     ChannelsArray channels() const;
+    uint32_t version() const { return version_.load(std::memory_order_acquire); }
 
 private:
     static etl::string<16> midiNoteToString(std::uint16_t noteNumber);
@@ -121,6 +123,7 @@ private:
     mutable std::mutex mutex_;
     ChannelsArray channels_;
     UpdateCallback updateCallback_;
+    std::atomic<uint32_t> version_{0};
 };
 
 } // namespace gui::common

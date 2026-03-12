@@ -72,6 +72,8 @@ void ChannelTelemetryViewModel::updateFromTelemetry(const midi2pwm::pwm::Channel
         callback = updateCallback_;
     }
 
+    version_.fetch_add(1, std::memory_order_release);
+
     if (callback.is_valid()) {
         callback(channels_);
     }
@@ -175,6 +177,8 @@ void ChannelTelemetryViewModel::updateFromConfig(const midi2pwm::pwm::ChannelCon
         callback = updateCallback_;
     }
 
+    version_.fetch_add(1, std::memory_order_release);
+
     if (callback.is_valid()) {
         callback(channels_);
     }
@@ -205,6 +209,8 @@ void ChannelTelemetryViewModel::clear()
 
         callback = updateCallback_;
     }
+
+    version_.fetch_add(1, std::memory_order_release);
 
     if (callback.is_valid()) {
         callback(channels_);

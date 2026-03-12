@@ -37,7 +37,9 @@ public:
 
     bool isConnected() const;
     bool isPeerAlive() const;
+    PeerState peerState() const;
     const std::vector<PortInfo> &ports() const;
+    uint32_t stateVersion() const { return stateVersion_.load(std::memory_order_acquire); }
 
     void setPortsChangedCallback(PortsChangedCallback portsListChangedCallback);
     void setConnectionChangedCallback(ConnectionChangedCallback connectionStateChangedCallback);
@@ -83,6 +85,7 @@ private:
     uint32_t lastFrameReceivedMs_{0};
     uint32_t lastHeartbeatSentMs_{0};
     std::atomic<bool> pendingTelemetryRequest_{false};
+    std::atomic<uint32_t> stateVersion_{0};
 };
 
 } // namespace gui::common

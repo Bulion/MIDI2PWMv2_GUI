@@ -28,8 +28,11 @@ void MidiMessageViewModel::updateFromChannelMessage(const midi2pwm::midi::Channe
     {
         std::lock_guard<std::mutex> lock(mutex_);
         last_message_ = text;
+        last_raw_message_ = message;
         callback = update_callback_;
     }
+
+    version_.fetch_add(1, std::memory_order_release);
 
     if (callback.is_valid()) {
         GUI_LOG_DEBUG(TAG, "Invoking update callback");
@@ -46,8 +49,11 @@ void MidiMessageViewModel::clear()
     {
         std::lock_guard<std::mutex> lock(mutex_);
         last_message_ = "No midi message received yet";
+        last_raw_message_ = {};
         callback = update_callback_;
     }
+
+    version_.fetch_add(1, std::memory_order_release);
 
     if (callback.is_valid()) {
         callback(last_message_);
@@ -58,6 +64,12 @@ MidiMessageViewModel::MessageString MidiMessageViewModel::lastMessage() const
 {
     std::lock_guard<std::mutex> lock(mutex_);
     return last_message_;
+}
+
+midi2pwm::midi::ChannelMessageT MidiMessageViewModel::lastRawMessage() const
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    return last_raw_message_;
 }
 
 MidiMessageViewModel::MessageString MidiMessageViewModel::ToString(const midi2pwm::midi::ChannelMessageT &message)
