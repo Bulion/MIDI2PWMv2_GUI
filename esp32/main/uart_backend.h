@@ -44,6 +44,7 @@ private:
     TaskHandle_t readerTaskHandle_{nullptr};
 
     mutable std::mutex callbackAccessMutex_;
+    std::mutex writeAccessMutex_;
     DataCallback dataReceivedCallback_;
     DisconnectCallback connectionLostCallback_;
 };

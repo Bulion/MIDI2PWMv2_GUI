@@ -9,7 +9,7 @@ namespace gui::esp32
 
 namespace
 {
-constexpr int kBufferSize = 2048;
+constexpr int kBufferSize = 8192;
 constexpr int kTaskStackSize = 8192;
 constexpr int kTaskPriority = 5;
 constexpr int kTaskCore = 0;
@@ -91,6 +91,7 @@ bool UartBackend::write(const std::uint8_t *data, std::size_t size)
         return false;
     }
 
+    std::lock_guard<std::mutex> writeLock(writeAccessMutex_);
     int bytesWrittenOrError = uart_write_bytes(kUartPort, data, size);
 
     if (bytesWrittenOrError < 0) {
@@ -168,7 +169,7 @@ void UartBackend::FreeRtosTaskEntryPoint(void *taskParameterPointer)
 
 void UartBackend::uartReaderTaskLoop()
 {
-    constexpr size_t RECEIVE_BUFFER_SIZE_BYTES = 256;
+    constexpr size_t RECEIVE_BUFFER_SIZE_BYTES = 1024;
     etl::array<std::uint8_t, RECEIVE_BUFFER_SIZE_BYTES> receiveBuffer{};
 
     while (readerTaskIsRunning_.load()) {
