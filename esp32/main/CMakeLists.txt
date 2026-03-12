@@ -2,15 +2,21 @@ set(GUI_UI_DIR "${CMAKE_CURRENT_LIST_DIR}/../../ui")
 
 idf_component_register(
     SRCS
-        "main.cpp"
-        "waveshare_rgb_lcd_port.cpp"
-        "uart_backend.cpp"
-        "log_forwarder.cpp"
-        "esp32_flash_writer.cpp"
-        "psram_buffered_flash_writer.cpp"
-    PRIV_REQUIRES driver app_update esp_timer
+        "src/main.cpp"
+        "src/display_init.cpp"
+        "src/ota_handler.cpp"
+        "src/comm_task.cpp"
+        "src/ui_callbacks.cpp"
+        "src/ui_poll_timer.cpp"
+        "src/waveshare_rgb_lcd_port.cpp"
+        "src/uart_backend.cpp"
+        "src/log_forwarder.cpp"
+        "src/esp32_flash_writer.cpp"
+        "src/psram_buffered_flash_writer.cpp"
+        "src/usb_midi_host.cpp"
+    PRIV_REQUIRES driver app_update esp_timer usb
     INCLUDE_DIRS
-        "."
+        "include"
     REQUIRES
         slint
 )
@@ -33,3 +39,4 @@ add_custom_command(
 
 idf_component_get_property(tusb_lib espressif__tinyusb COMPONENT_LIB)
 target_include_directories(${tusb_lib} PRIVATE "${CMAKE_CURRENT_LIST_DIR}/tinyusb_config")
+target_include_directories(${COMPONENT_LIB} PRIVATE "${CMAKE_CURRENT_LIST_DIR}/tinyusb_config")
