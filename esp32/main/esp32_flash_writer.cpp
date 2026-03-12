@@ -74,7 +74,7 @@ bool Esp32FlashWriter::verify(std::uint32_t expectedCrc32)
     }
 
     static constexpr std::size_t READ_BUF_SIZE = 4096;
-    std::uint8_t buf[READ_BUF_SIZE];
+    static std::uint8_t buf[READ_BUF_SIZE];
     std::uint32_t crc = 0;
     std::uint32_t remaining = bytesWritten_;
     std::uint32_t offset = 0;
@@ -92,14 +92,13 @@ bool Esp32FlashWriter::verify(std::uint32_t expectedCrc32)
         remaining -= static_cast<std::uint32_t>(toRead);
     }
 
+    GUI_LOG_INFO("Esp32FlashWriter", "CRC check: computed=0x%08lX expected=0x%08lX bytes=%lu",
+                 static_cast<unsigned long>(crc),
+                 static_cast<unsigned long>(expectedCrc32),
+                 static_cast<unsigned long>(bytesWritten_));
     if (crc != expectedCrc32) {
-        GUI_LOG_ERROR("Esp32FlashWriter", "CRC mismatch: expected 0x%08lX, got 0x%08lX",
-                      static_cast<unsigned long>(expectedCrc32),
-                      static_cast<unsigned long>(crc));
         return false;
     }
-
-    GUI_LOG_INFO("Esp32FlashWriter", "CRC verified: 0x%08lX", static_cast<unsigned long>(crc));
     return true;
 }
 
@@ -115,11 +114,10 @@ bool Esp32FlashWriter::activate()
         return false;
     }
 
-    GUI_LOG_INFO("Esp32FlashWriter", "Activated partition %s, rebooting...",
+    GUI_LOG_INFO("Esp32FlashWriter", "Activated partition %s",
                  updatePartition_->label);
 
     inProgress_ = false;
-    esp_restart();
     return true;
 }
 
