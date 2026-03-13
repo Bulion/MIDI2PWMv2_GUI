@@ -19,6 +19,7 @@ class MessageProcessor
 {
 public:
     using MidiChannelMessageCallback = etl::delegate<void(const midi2pwm::midi::ChannelMessageT &)>;
+    using MidiForwardCallback = etl::delegate<void(const midi2pwm::midi::ChannelMessageT &)>;
     using PwmTelemetryCallback = etl::delegate<void(const midi2pwm::pwm::ChannelTelemetry &)>;
     using ChannelConfigCallback = etl::delegate<void(const midi2pwm::pwm::ChannelConfig &)>;
     using HeartBeatCallback = etl::delegate<void(const midi2pwm::pwm::HeartBeat &)>;
@@ -44,9 +45,12 @@ public:
     void setOtaDataCallback(OtaDataCallback callback);
     void setOtaEndCallback(OtaEndCallback callback);
     void setOtaAbortCallback(OtaAbortCallback callback);
+    void setMidiForwardCallback(MidiForwardCallback callback);
     void setUnknownFrameCallback(UnknownFrameCallback callback);
     void handleFrame(const std::uint8_t *frame, std::size_t size);
 
+    bool sendMidiChannelMessage(midi2pwm::midi::ChannelMessageType type,
+                                std::uint8_t channel, std::uint8_t data1, std::uint8_t data2);
     bool sendChannelConfig(const midi2pwm::pwm::ChannelConfigT &config);
     bool sendHeartBeat(bool requestTelemetry, uint16_t epoch);
     bool sendOtaBegin(midi2pwm::ota::Target target, std::uint32_t firmwareSize,
@@ -77,6 +81,7 @@ private:
     libcomm::PwmEndpoint pwmEndpoint_;
     libcomm::OtaEndpoint otaEndpoint_;
     MidiChannelMessageCallback midiChannelCallback_;
+    MidiForwardCallback midiForwardCallback_;
     PwmTelemetryCallback pwmTelemetryCallback_;
     ChannelConfigCallback channelConfigCallback_;
     HeartBeatCallback heartBeatCallback_;

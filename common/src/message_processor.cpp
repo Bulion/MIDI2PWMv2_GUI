@@ -119,9 +119,48 @@ void MessageProcessor::setOtaAbortCallback(OtaAbortCallback callback)
     otaAbortCallback_ = callback;
 }
 
+void MessageProcessor::setMidiForwardCallback(MidiForwardCallback callback)
+{
+    midiForwardCallback_ = callback;
+}
+
 void MessageProcessor::setUnknownFrameCallback(UnknownFrameCallback callback)
 {
     unknownFrameCallback_ = callback;
+}
+
+bool MessageProcessor::sendMidiChannelMessage(midi2pwm::midi::ChannelMessageType type,
+                                                std::uint8_t channel, std::uint8_t data1, std::uint8_t data2)
+{
+    flatbuffers::DetachedBuffer buffer;
+
+    switch (type) {
+    case midi2pwm::midi::ChannelMessageType::NoteOff:
+        buffer = libcomm::BuildNoteOffMessage(channel, data1, data2);
+        break;
+    case midi2pwm::midi::ChannelMessageType::NoteOn:
+        buffer = libcomm::BuildNoteOnMessage(channel, data1, data2);
+        break;
+    case midi2pwm::midi::ChannelMessageType::PolyphonicKeyPressure:
+        buffer = libcomm::BuildPolyphonicKeyPressureMessage(channel, data1, data2);
+        break;
+    case midi2pwm::midi::ChannelMessageType::ControlChange:
+        buffer = libcomm::BuildControlChangeMessage(channel, data1, data2);
+        break;
+    case midi2pwm::midi::ChannelMessageType::ProgramChange:
+        buffer = libcomm::BuildProgramChangeMessage(channel, data1);
+        break;
+    case midi2pwm::midi::ChannelMessageType::ChannelPressure:
+        buffer = libcomm::BuildChannelPressureMessage(channel, data1);
+        break;
+    case midi2pwm::midi::ChannelMessageType::PitchBend:
+        buffer = libcomm::BuildPitchBendMessage(channel, static_cast<std::uint16_t>(data1 | (data2 << 7)));
+        break;
+    default:
+        return false;
+    }
+
+    return midiEndpoint_.Send(std::move(buffer));
 }
 
 bool MessageProcessor::sendChannelConfig(const midi2pwm::pwm::ChannelConfigT &config)
@@ -349,17 +388,18 @@ void MessageProcessor::HandleMidiChannelMessage(const midi2pwm::midi::ChannelMes
                  message.channel(), static_cast<unsigned>(message.message_type()),
                  message.data1(), message.data2());
 
-    if (!midiChannelCallback_.is_valid()) {
-        GUI_LOG_ERROR("MessageProcessor", "MIDI channel callback not registered!");
-        return;
-    }
-
     midi2pwm::midi::ChannelMessageT native;
     message.UnPackTo(&native);
 
-    GUI_LOG_DEBUG("MessageProcessor", "Unpacked to native type, invoking callback");
-    midiChannelCallback_(native);
-    GUI_LOG_DEBUG("MessageProcessor", "MIDI callback completed");
+    if (midiChannelCallback_.is_valid()) {
+        GUI_LOG_DEBUG("MessageProcessor", "Unpacked to native type, invoking callback");
+        midiChannelCallback_(native);
+        GUI_LOG_DEBUG("MessageProcessor", "MIDI callback completed");
+    }
+
+    if (midiForwardCallback_.is_valid()) {
+        midiForwardCallback_(native);
+    }
 }
 
 void MessageProcessor::HandlePwmTelemetry(const midi2pwm::pwm::ChannelTelemetry &telemetry)
