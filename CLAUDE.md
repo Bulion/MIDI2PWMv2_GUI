@@ -934,6 +934,51 @@ Implementation: [common/src/view_models/connection_view_model.cpp](common/src/vi
 - **Loading states**: Show loading indicators for async operations
 - **Error states**: Clear error messages and recovery options
 
+## Tools (`tools/`)
+
+### libcomm Decode Library (`tools/libcomm_decode/`)
+
+Reusable Python library for decoding libcomm frame transport traffic. Handles frame synchronization (version/type header, CRC32 validation) and FlatBuffers deserialization for all protocols (LOG, MIDI, PWM, OTA).
+
+**Usage as library:**
+```python
+from libcomm_decode import FrameReader, LibcommDecoder
+
+reader = FrameReader()
+decoder = LibcommDecoder()
+decoder.on("MIDI", lambda msg: print(msg))  # subscribe to MIDI only
+decoder.on_any(lambda msg: print(msg))       # subscribe to everything
+
+reader.feed(serial_data)
+while (frame := reader.read_frame()):
+    decoder.decode_frame(frame)
+```
+
+Generated FlatBuffers Python bindings live in `tools/libcomm_decode/generated/`. Regenerate with:
+```bash
+flatc --python -o tools/libcomm_decode/generated libcomm/schemas/*.fbs
+```
+
+### CLI Tools
+
+| Script | Description |
+|--------|-------------|
+| `libcomm_monitor.py` | Monitor libcomm serial traffic with protocol filtering (`-f LOG`, `-f MIDI`, etc.) and timestamps (`-t`) |
+| `e2e_channel_test.py` | End-to-end MIDI→PWM test: sends NoteOn/Off and CC via FlatBuffers CDC to verify PWM output |
+| `send_noteon.py` | Send a single MIDI NoteOn message to the device |
+| `ota_update.py` | OTA firmware update CLI supporting serial (USB CDC) and BLE transports with auto-detection of target |
+| `test_ota_relay.py` | HITL test for the OTA relay pipeline: Host → CDC → STM32 → UART → ESP32 → CDC → Host |
+| `ota_diag.py` | Send OtaBegin/OtaData frames and monitor responses for OTA protocol debugging |
+| `diag_otadata.py` | Diagnostic tool to send OTA frames and capture debug output around frame processing |
+| `calibrate_cs.py` | Manual current sense calibration: steps through current levels, waits for user input to record offsets |
+| `calibrate_cs_auto.py` | Automated CS calibration using DL24 power meter to measure and record sensor offsets |
+| `calibrate_vsense_auto.py` | Automated voltage sense calibration using DL24 power meter |
+| `test_ocp.py` | Over-current protection test: steps through increasing current levels with DL24 to verify OCP thresholds |
+| `pressure_test.py` | Stress test: rapidly sends MIDI NoteOn messages to verify reliable serial communication under load |
+| `test_log_forward.py` | Test STM32 CDC log forwarding by monitoring data and debug ports simultaneously |
+| `test_uart_dma.py` | Test STM32 DMA TX relay to ESP32 by sending OtaBegin and monitoring CDC + debug output |
+| `compare_ports.py` | Parse and compare frame traffic from two serial ports (CDC vs UART) to verify relay operation |
+
 ## Resources
 
 - Slint documentation: https://slint.dev/docs
