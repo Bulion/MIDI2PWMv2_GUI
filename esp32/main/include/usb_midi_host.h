@@ -1,14 +1,12 @@
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-#include <functional>
+#include "midi_byte_stream_decoder.h"
 
 namespace gui::esp32
 {
 
-using MidiRxCallback = std::function<void(const std::uint8_t *data, std::size_t size)>;
-
-bool initUsbMidiHost(MidiRxCallback onMidiReceived);
+bool initUsbMidiHost();
+bool sendToUsbMidi(const ParsedMidiMessage &msg);
+bool pollUsbMidiRx(ParsedMidiMessage &msg);
 
 } // namespace gui::esp32
