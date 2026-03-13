@@ -3,10 +3,12 @@
 #include "display_init.h"
 #include "log_forwarder.h"
 #include "midi_assignment_state.h"
+#include "midi_bridge.h"
 #include "ota_handler.h"
 #include "uart_backend.h"
 #include "ui_callbacks.h"
 #include "ui_poll_timer.h"
+#include "usb_midi_host.h"
 
 #include "gui_common/comm_loop.h"
 #include "gui_common/log.h"
@@ -35,11 +37,13 @@ extern "C" void app_main(void)
         abort();
     }
 
-    gui::esp32::initLogForwarder(true);
+    gui::esp32::initLogForwarder(false);
+    gui::esp32::initUsbMidiHost();
 
     ConnectionViewModel connectionViewModel{backend, midiViewModel, channelTelemetryViewModel};
     gui::common::CommLoop commLoop(connectionViewModel);
 
+    gui::esp32::initMidiBridge(connectionViewModel.messageProcessor());
     gui::esp32::initOtaHandler(connectionViewModel, backend);
     gui::esp32::registerOtaCallbacks(connectionViewModel.messageProcessor());
     gui::esp32::startCommTask(commLoop);

@@ -1,5 +1,6 @@
 #include "comm_task.h"
 
+#include "midi_bridge.h"
 #include "ota_handler.h"
 
 #include <freertos/FreeRTOS.h>
@@ -17,6 +18,7 @@ void commTaskFn(void *param)
     while (!loop->shouldStop()) {
         loop->runOnce();
         checkOtaDataTimeout();
+        pollMidiBridge();
         vTaskDelay(pdMS_TO_TICKS(50));
     }
     vTaskDelete(nullptr);

@@ -14,6 +14,7 @@ idf_component_register(
         "src/esp32_flash_writer.cpp"
         "src/psram_buffered_flash_writer.cpp"
         "src/usb_midi_host.cpp"
+        "src/midi_bridge.cpp"
     PRIV_REQUIRES driver app_update esp_timer usb
     INCLUDE_DIRS
         "include"
@@ -38,5 +39,14 @@ add_custom_command(
 )
 
 idf_component_get_property(tusb_lib espressif__tinyusb COMPONENT_LIB)
+idf_component_get_property(tusb_dir espressif__tinyusb COMPONENT_DIR)
 target_include_directories(${tusb_lib} PRIVATE "${CMAKE_CURRENT_LIST_DIR}/tinyusb_config")
 target_include_directories(${COMPONENT_LIB} PRIVATE "${CMAKE_CURRENT_LIST_DIR}/tinyusb_config")
+
+target_sources(${tusb_lib} PRIVATE
+    "${tusb_dir}/src/host/usbh.c"
+    "${tusb_dir}/src/host/hub.c"
+    "${tusb_dir}/src/class/midi/midi_host.c"
+    "${tusb_dir}/src/portable/synopsys/dwc2/hcd_dwc2.c"
+)
+target_include_directories(${tusb_lib} PRIVATE "${tusb_dir}/src/host")
