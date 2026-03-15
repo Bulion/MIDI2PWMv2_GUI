@@ -28,5 +28,6 @@ void initOtaHandler(gui::common::ConnectionViewModel &vm, UartBackend &backend);
 void registerOtaCallbacks(gui::common::MessageProcessor &msgProc);
 void checkOtaDataTimeout();
 OtaDisplayState &otaDisplayState();
+bool isOtaActive();
 
 } // namespace gui::esp32

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "libcomm/log_endpoint.h"
 #include "libcomm/midi_endpoint.h"
 #include "libcomm/ota_endpoint.h"
 #include "libcomm/pwm_endpoint.h"
@@ -63,6 +64,7 @@ public:
     bool sendOtaProgress(midi2pwm::ota::Target target, midi2pwm::ota::OtaStatus status,
                          std::uint16_t chunksReceived, std::uint16_t totalChunks,
                          const char *errorMessage = nullptr);
+    bool sendLogForward(midi2pwm::log::LogLevel level, const char *tag, const char *message);
 
 private:
     static bool NullWrite(const std::uint8_t *, std::size_t);
@@ -77,6 +79,7 @@ private:
     void HandleOtaEnd(const midi2pwm::ota::OtaEnd &end);
     void HandleOtaAbort(const midi2pwm::ota::OtaAbort &abort);
 
+    libcomm::LogEndpoint logEndpoint_;
     libcomm::MidiEndpoint midiEndpoint_;
     libcomm::PwmEndpoint pwmEndpoint_;
     libcomm::OtaEndpoint otaEndpoint_;

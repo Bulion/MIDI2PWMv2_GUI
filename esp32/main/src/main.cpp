@@ -37,12 +37,12 @@ extern "C" void app_main(void)
         abort();
     }
 
-    gui::esp32::initLogForwarder(false);
     gui::esp32::initUsbMidiHost();
 
     ConnectionViewModel connectionViewModel{backend, midiViewModel, channelTelemetryViewModel};
     gui::common::CommLoop commLoop(connectionViewModel);
 
+    gui::esp32::initLogForwarder(connectionViewModel.messageProcessor(), false);
     gui::esp32::initMidiBridge(connectionViewModel.messageProcessor());
     gui::esp32::initOtaHandler(connectionViewModel, backend);
     gui::esp32::registerOtaCallbacks(connectionViewModel.messageProcessor());

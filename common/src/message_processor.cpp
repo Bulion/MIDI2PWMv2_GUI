@@ -7,7 +7,8 @@ namespace gui::common
 {
 
 MessageProcessor::MessageProcessor()
-    : midiEndpoint_(libcomm::MidiEndpoint::WriteCallback::create<&MessageProcessor::NullWrite>())
+    : logEndpoint_(libcomm::LogEndpoint::WriteCallback::create<&MessageProcessor::NullWrite>())
+    , midiEndpoint_(libcomm::MidiEndpoint::WriteCallback::create<&MessageProcessor::NullWrite>())
     , pwmEndpoint_(libcomm::PwmEndpoint::WriteCallback::create<&MessageProcessor::NullWrite>())
     , otaEndpoint_(libcomm::OtaEndpoint::WriteCallback::create<&MessageProcessor::NullWrite>())
 {
@@ -36,7 +37,8 @@ MessageProcessor::MessageProcessor()
 }
 
 MessageProcessor::MessageProcessor(WriteCallback writeCallback)
-    : midiEndpoint_(writeCallback)
+    : logEndpoint_(writeCallback)
+    , midiEndpoint_(writeCallback)
     , pwmEndpoint_(writeCallback)
     , otaEndpoint_(writeCallback)
 {
@@ -541,6 +543,12 @@ bool MessageProcessor::sendOtaProgress(midi2pwm::ota::Target target, midi2pwm::o
 {
     auto buffer = libcomm::BuildOtaProgressMessage(target, status, chunksReceived, totalChunks, errorMessage);
     return otaEndpoint_.Send(std::move(buffer));
+}
+
+bool MessageProcessor::sendLogForward(midi2pwm::log::LogLevel level, const char *tag, const char *message)
+{
+    auto buffer = libcomm::BuildLogForwardMessage(level, tag, message);
+    return logEndpoint_.Send(std::move(buffer));
 }
 
 } // namespace gui::common

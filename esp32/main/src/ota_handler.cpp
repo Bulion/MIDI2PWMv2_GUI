@@ -169,4 +169,10 @@ OtaDisplayState &otaDisplayState()
     return s_otaDisplay;
 }
 
+bool isOtaActive()
+{
+    auto status = s_otaManager.status();
+    return status != midi2pwm::ota::OtaStatus::Idle;
+}
+
 } // namespace gui::esp32

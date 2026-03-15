@@ -1,8 +1,7 @@
 #include "log_forwarder.h"
 
-#include "libcomm/log_endpoint.h"
+#include "ota_handler.h"
 
-#include "driver/uart.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
@@ -18,7 +17,6 @@ namespace gui::esp32
 namespace
 {
 
-constexpr uart_port_t kUartPort = UART_NUM_0;
 constexpr size_t kQueueCapacity = 16;
 constexpr size_t kTagMaxLength = 32;
 constexpr size_t kMessageMaxLength = 192;
@@ -35,15 +33,9 @@ struct LogMessage {
 QueueHandle_t logQueue = nullptr;
 TaskHandle_t senderTaskHandle = nullptr;
 vprintf_like_t originalVprintf = nullptr;
-libcomm::LogEndpoint *logEndpoint = nullptr;
+gui::common::MessageProcessor *messageProcessor = nullptr;
 std::atomic<bool> insideSend{false};
 bool mirrorToConsole{false};
-
-bool logUartWrite(const std::uint8_t *data, std::size_t size)
-{
-    int written = uart_write_bytes(kUartPort, data, size);
-    return written == static_cast<int>(size);
-}
 
 midi2pwm::log::LogLevel charToLogLevel(char levelChar)
 {
@@ -128,7 +120,7 @@ void parseEspLogFormat(const char *formatted, LogMessage &logMessage)
 
 int customLogVprintf(const char *fmt, va_list args)
 {
-    if (insideSend.load(std::memory_order_relaxed)) {
+    if (insideSend.load(std::memory_order_relaxed) || gui::esp32::isOtaActive()) {
         return 0;
     }
 
@@ -167,11 +159,9 @@ void logSenderTask(void *param)
 
     while (true) {
         if (xQueueReceive(logQueue, &logMessage, portMAX_DELAY) == pdTRUE) {
-            auto buffer = libcomm::BuildLogForwardMessage(
-                logMessage.level, logMessage.tag, logMessage.message);
-
             insideSend.store(true, std::memory_order_relaxed);
-            logEndpoint->Send(std::move(buffer));
+            messageProcessor->sendLogForward(
+                logMessage.level, logMessage.tag, logMessage.message);
             insideSend.store(false, std::memory_order_relaxed);
         }
     }
@@ -179,12 +169,10 @@ void logSenderTask(void *param)
 
 } // namespace
 
-void initLogForwarder(bool alsoMirrorToConsole)
+void initLogForwarder(gui::common::MessageProcessor &msgProc, bool alsoMirrorToConsole)
 {
     mirrorToConsole = alsoMirrorToConsole;
-    static libcomm::LogEndpoint endpoint(
-        libcomm::LogEndpoint::WriteCallback::create<&logUartWrite>());
-    logEndpoint = &endpoint;
+    messageProcessor = &msgProc;
 
     logQueue = xQueueCreate(kQueueCapacity, sizeof(LogMessage));
 
@@ -223,7 +211,7 @@ void deinitLogForwarder()
         logQueue = nullptr;
     }
 
-    logEndpoint = nullptr;
+    messageProcessor = nullptr;
 }
 
 } // namespace gui::esp32
