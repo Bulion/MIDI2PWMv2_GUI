@@ -13,6 +13,7 @@ namespace
 constexpr const char *TAG = "MidiBridge";
 
 gui::common::MessageProcessor *s_processor = nullptr;
+gui::common::MidiMessageViewModel *s_midiViewModel = nullptr;
 
 void forwardToUsbMidi(const midi2pwm::midi::ChannelMessageT &msg)
 {
@@ -26,9 +27,11 @@ void forwardToUsbMidi(const midi2pwm::midi::ChannelMessageT &msg)
 
 } // namespace
 
-void initMidiBridge(gui::common::MessageProcessor &processor)
+void initMidiBridge(gui::common::MessageProcessor &processor,
+                    gui::common::MidiMessageViewModel &midiViewModel)
 {
     s_processor = &processor;
+    s_midiViewModel = &midiViewModel;
 
     processor.setMidiForwardCallback(
         gui::common::MessageProcessor::MidiForwardCallback::create<forwardToUsbMidi>());
@@ -45,6 +48,15 @@ void pollMidiBridge()
     ParsedMidiMessage msg;
     while (pollUsbMidiRx(msg)) {
         s_processor->sendMidiChannelMessage(msg.type, msg.channel, msg.data1, msg.data2);
+
+        if (s_midiViewModel) {
+            midi2pwm::midi::ChannelMessageT native;
+            native.message_type = msg.type;
+            native.channel = msg.channel;
+            native.data1 = msg.data1;
+            native.data2 = msg.data2;
+            s_midiViewModel->updateFromChannelMessage(native);
+        }
     }
 }
 

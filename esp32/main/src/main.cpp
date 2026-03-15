@@ -43,7 +43,7 @@ extern "C" void app_main(void)
     gui::common::CommLoop commLoop(connectionViewModel);
 
     gui::esp32::initLogForwarder(connectionViewModel.messageProcessor(), false);
-    gui::esp32::initMidiBridge(connectionViewModel.messageProcessor());
+    gui::esp32::initMidiBridge(connectionViewModel.messageProcessor(), midiViewModel);
     gui::esp32::initOtaHandler(connectionViewModel, backend);
     gui::esp32::registerOtaCallbacks(connectionViewModel.messageProcessor());
     gui::esp32::startCommTask(commLoop);
