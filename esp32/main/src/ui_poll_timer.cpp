@@ -150,7 +150,9 @@ void startUiPollTimer(slint::ComponentHandle<AppWindow> app,
                     break;
                 case Status::Receiving: {
                     float pct = total > 0 ? 100.f * chunks / total : 0.f;
-                    uint32_t kbReceived = static_cast<uint32_t>(chunks);
+                    uint32_t bytesReceived = total > 0 ? static_cast<uint32_t>(
+                        static_cast<uint64_t>(compressedSize) * chunks / total) : 0;
+                    uint32_t kbReceived = bytesReceived / 1024;
                     uint32_t kbTotal = compressedSize / 1024;
                     char detail[32];
                     std::snprintf(detail, sizeof(detail), "%lu / %lu KB",
