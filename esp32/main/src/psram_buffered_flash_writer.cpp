@@ -41,16 +41,27 @@ void PsramBufferedFlashWriter::setCompressedTransfer(std::uint32_t compressedSiz
     compressedSize_ = compressedSize;
     compressedCrc32_ = compressedCrc32;
     uncompressedSize_ = uncompressedSize;
-    GUI_LOG_INFO(TAG, "Compressed transfer: %lu -> %lu bytes (%.0f%%)",
-                 static_cast<unsigned long>(compressedSize),
-                 static_cast<unsigned long>(uncompressedSize),
-                 100.0f * static_cast<float>(compressedSize) / static_cast<float>(uncompressedSize));
+
+    if (isCompressed()) {
+        GUI_LOG_INFO(TAG, "Compressed transfer: %lu -> %lu bytes (%.0f%%)",
+                     static_cast<unsigned long>(compressedSize),
+                     static_cast<unsigned long>(uncompressedSize),
+                     100.0f * static_cast<float>(compressedSize) / static_cast<float>(uncompressedSize));
+    } else {
+        GUI_LOG_INFO(TAG, "Uncompressed transfer: %lu bytes",
+                     static_cast<unsigned long>(uncompressedSize));
+    }
 }
 
-bool PsramBufferedFlashWriter::begin(std::uint32_t)
+bool PsramBufferedFlashWriter::begin(std::uint32_t firmwareSize)
 {
     freePsramBuffer();
     bytesBuffered_ = 0;
+
+    if (!isCompressed()) {
+        GUI_LOG_INFO(TAG, "Uncompressed mode: writing directly to flash");
+        return delegate_.begin(firmwareSize);
+    }
 
     psramBuffer_ = static_cast<std::uint8_t*>(
         heap_caps_malloc(compressedSize_, MALLOC_CAP_SPIRAM));
@@ -67,6 +78,10 @@ bool PsramBufferedFlashWriter::begin(std::uint32_t)
 
 bool PsramBufferedFlashWriter::writeChunk(std::uint16_t index, const std::uint8_t* data, std::size_t len)
 {
+    if (!isCompressed()) {
+        return delegate_.writeChunk(index, data, len);
+    }
+
     if (!psramBuffer_) {
         return false;
     }
@@ -87,6 +102,10 @@ bool PsramBufferedFlashWriter::writeChunk(std::uint16_t index, const std::uint8_
 
 bool PsramBufferedFlashWriter::finish()
 {
+    if (!isCompressed()) {
+        return delegate_.finish();
+    }
+
     if (!psramBuffer_) {
         return false;
     }

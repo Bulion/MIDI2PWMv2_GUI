@@ -23,6 +23,7 @@ public:
     void abort() override;
 
 private:
+    bool isCompressed() const { return compressedSize_ > 0; }
     void freePsramBuffer();
 
     libcomm::IFlashWriter& delegate_;

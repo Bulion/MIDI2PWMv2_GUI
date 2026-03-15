@@ -126,13 +126,15 @@ void startUiPollTimer(slint::ComponentHandle<AppWindow> app,
             midi2pwm::ota::OtaStatus otaStatus;
             uint16_t chunks = 0;
             uint16_t total = 0;
-            uint32_t compressedSize = 0;
+            uint32_t transferSize = 0;
             {
                 std::lock_guard lock(otaDisplay.mutex);
                 otaStatus = otaDisplay.status;
                 chunks = otaDisplay.chunksReceived;
                 total = otaDisplay.totalChunks;
-                compressedSize = otaDisplay.compressedSize;
+                transferSize = otaDisplay.compressedSize > 0
+                    ? otaDisplay.compressedSize
+                    : otaDisplay.firmwareSize;
             }
 
             bool showScreen = (otaStatus != midi2pwm::ota::OtaStatus::Idle);
@@ -145,15 +147,15 @@ void startUiPollTimer(slint::ComponentHandle<AppWindow> app,
                 switch (otaStatus) {
                 case Status::Preparing:
                     app->set_ota_screen_phase_text(slint::SharedString("Preparing..."));
-                    app->set_ota_screen_detail_text(slint::SharedString("Allocating PSRAM buffer"));
+                    app->set_ota_screen_detail_text(slint::SharedString("Preparing for update"));
                     app->set_ota_screen_progress(0);
                     break;
                 case Status::Receiving: {
                     float pct = total > 0 ? 100.f * chunks / total : 0.f;
                     uint32_t bytesReceived = total > 0 ? static_cast<uint32_t>(
-                        static_cast<uint64_t>(compressedSize) * chunks / total) : 0;
+                        static_cast<uint64_t>(transferSize) * chunks / total) : 0;
                     uint32_t kbReceived = bytesReceived / 1024;
-                    uint32_t kbTotal = compressedSize / 1024;
+                    uint32_t kbTotal = transferSize / 1024;
                     char detail[32];
                     std::snprintf(detail, sizeof(detail), "%lu / %lu KB",
                                   static_cast<unsigned long>(kbReceived),
