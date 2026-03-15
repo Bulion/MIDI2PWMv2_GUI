@@ -2,6 +2,7 @@
 
 #include "gui_common/log.h"
 #include "driver/uart.h"
+#include "esp_intr_alloc.h"
 #include "etl/array.h"
 
 namespace gui::esp32
@@ -9,7 +10,7 @@ namespace gui::esp32
 
 namespace
 {
-constexpr int kBufferSize = 8192;
+constexpr int kBufferSize = 16384;
 constexpr int kTaskStackSize = 8192;
 constexpr int kTaskPriority = 5;
 constexpr int kTaskCore = 0;
@@ -30,6 +31,7 @@ bool UartBackend::initialize()
     uart_driver_delete(kUartPort);
     uart_driver_install(kUartPort, kBufferSize, 0, 0, nullptr, 0);
     uart_param_config(kUartPort, &uartConfiguration);
+    uart_set_rx_full_threshold(kUartPort, 64);
 
     initialized_ = true;
     return true;
