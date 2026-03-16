@@ -6,6 +6,7 @@ export component LinearGauge {
     in property <float> value: 50.0;
     in property <brush> track_color: AppStyle.bg_track;
     in property <brush> fill_color: AppStyle.accent_blue;
+    in property <bool> reverse: false;
 
     private property <float> normalized_value: Math.max(0, Math.min(1, (root.value - root.min_value) / Math.max(0.0001, root.max_value - root.min_value)));
 
@@ -18,7 +19,7 @@ export component LinearGauge {
     }
 
     Rectangle {
-        x: 0px;
+        x: root.reverse ? parent.width - self.width : 0px;
         y: 0px;
         width: parent.width * normalized_value;
         height: parent.height;

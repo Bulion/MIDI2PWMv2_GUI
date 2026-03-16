@@ -72,12 +72,18 @@ export component ChannelCard {
     in property <float> current: 2300.0;
     in property <float> duty_cycle: 50.0;
     in property <bool> is_active: false;
+    in property <bool> has_fault: false;
     in property <bool> invert: false;
+    in property <int> mode_type: 0;
+    in property <int> polarity: 0;
     callback clicked;
 
+    private property <bool> is_cc_mode: root.mode_type == 5;
+    private property <bool> is_reverse: root.invert ? root.polarity != 1 : root.polarity == 1;
+    private property <float> effective_duty_cycle: (root.is_active || root.is_cc_mode) ? root.duty_cycle : 0.0;
     private property <string> voltage_formatted: Math.round(root.voltage * 10) / 10;
     private property <string> current_formatted: Math.round(root.current);
-    private property <string> duty_cycle_formatted: Math.round(root.duty_cycle * 10) / 10;
+    private property <string> duty_cycle_formatted: Math.round(root.effective_duty_cycle * 10) / 10;
 
     width: AppStyle.card_width;
     height: AppStyle.card_height;
@@ -95,12 +101,6 @@ export component ChannelCard {
         height: parent.height;
 
         Rectangle {
-            width: parent.width;
-            height: parent.height;
-            background: root.is_active ? AppStyle.card_bg_active : transparent;
-        }
-
-        Rectangle {
             OutputsIndicator {
                 y: root.invert ? 0px : root.height - self.height;
             }
@@ -108,7 +108,11 @@ export component ChannelCard {
             Image {
                 width: parent.width;
                 height: parent.height;
-                source: root.invert ? @image-url("assets/channel-card-inverted.png") : @image-url("assets/channel-card.png");
+                source: root.has_fault
+                    ? (root.invert ? @image-url("assets/channel-card-inverted-error.png") : @image-url("assets/channel-card-error.png"))
+                    : root.is_active
+                        ? (root.invert ? @image-url("assets/channel-card-inverted-active.png") : @image-url("assets/channel-card-active.png"))
+                        : (root.invert ? @image-url("assets/channel-card-inverted.png") : @image-url("assets/channel-card.png"));
             }
         }
 
@@ -119,7 +123,8 @@ export component ChannelCard {
             spacing: AppStyle.spacing_xs;
 
             if root.invert: DutyCycleGauge {
-                value: root.duty_cycle;
+                value: root.effective_duty_cycle;
+                reverse: root.is_reverse;
             }
             if root.invert: DutyCycleText {
                 text: root.duty_cycle_formatted + " %";
@@ -141,7 +146,8 @@ export component ChannelCard {
                 text: root.duty_cycle_formatted + " %";
             }
             if !root.invert: DutyCycleGauge {
-                value: root.duty_cycle;
+                value: root.effective_duty_cycle;
+                reverse: root.is_reverse;
             }
         }
     }

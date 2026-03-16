@@ -275,6 +275,9 @@ export component AppWindow inherits Window {
             current: root.channel_model.length > i ? root.channel_model[i].current : 0.0;
             duty_cycle: root.channel_model.length > i ? root.channel_model[i].duty_cycle : 0.0;
             is_active: root.channel_model.length > i ? root.channel_model[i].is_active : false;
+            has_fault: root.channel_model.length > i ? (root.channel_model[i].fault == "FAULT" || root.channel_model[i].fault == "HAD_FAULT") : false;
+            mode_type: root.channel_model.length > i ? root.channel_model[i].mode_type : 0;
+            polarity: root.channel_model.length > i ? root.channel_model[i].polarity : 0;
             invert: row_count == 0;
         }
 
