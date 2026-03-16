@@ -134,3 +134,12 @@ void Esp32FlashWriter::abort()
 
     GUI_LOG_INFO("Esp32FlashWriter", "OTA aborted");
 }
+
+std::uint32_t Esp32FlashWriter::maxFirmwareSize() const
+{
+    const esp_partition_t* partition = esp_ota_get_next_update_partition(nullptr);
+    if (partition) {
+        return partition->size;
+    }
+    return 0;
+}

@@ -223,6 +223,11 @@ void PsramBufferedFlashWriter::abort()
     delegate_.abort();
 }
 
+std::uint32_t PsramBufferedFlashWriter::maxFirmwareSize() const
+{
+    return delegate_.maxFirmwareSize();
+}
+
 void PsramBufferedFlashWriter::freePsramBuffer()
 {
     if (psramBuffer_) {

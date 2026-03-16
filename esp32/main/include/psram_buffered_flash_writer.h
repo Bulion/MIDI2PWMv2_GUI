@@ -21,6 +21,7 @@ public:
     bool verify(std::uint32_t expectedCrc32) override;
     bool activate() override;
     void abort() override;
+    std::uint32_t maxFirmwareSize() const override;
 
 private:
     bool isCompressed() const { return compressedSize_ > 0; }
