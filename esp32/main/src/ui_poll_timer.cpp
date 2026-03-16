@@ -37,13 +37,14 @@ void startUiPollTimer(slint::ComponentHandle<AppWindow> app,
     int64_t lastOtaUpdateUs = 0;
     int64_t otaErrorShownAtUs = 0;
     uint32_t lastOtaDisplayVersion = 0;
+    bool otaRebootWaitingForReconnect = false;
     std::shared_ptr<slint::VectorModel<ChannelData>> channelModel;
 
     s_uiPollTimer = std::make_unique<slint::Timer>(std::chrono::milliseconds(100),
         [app, &commLoop, &connVm, &telVm, &midiVm, &assignState,
          lastConnVersion, lastTelVersion, lastMidiVersion,
          lastOtaUpdateUs, otaErrorShownAtUs, lastOtaDisplayVersion,
-         channelModel]() mutable {
+         otaRebootWaitingForReconnect, channelModel]() mutable {
 
         uint32_t connVer = connVm.stateVersion();
         if (connVer != lastConnVersion) {
@@ -65,7 +66,8 @@ void startUiPollTimer(slint::ComponentHandle<AppWindow> app,
         }
 
         uint32_t telVer = telVm.version();
-        if (telVer != lastTelVersion) {
+        bool telemetryChanged = (telVer != lastTelVersion);
+        if (telemetryChanged) {
             lastTelVersion = telVer;
             auto channels = telVm.channels();
 
@@ -124,18 +126,22 @@ void startUiPollTimer(slint::ComponentHandle<AppWindow> app,
             lastOtaUpdateUs = nowUs;
 
             midi2pwm::ota::OtaStatus otaStatus;
+            midi2pwm::ota::Target otaTarget;
             uint16_t chunks = 0;
             uint16_t total = 0;
             uint32_t transferSize = 0;
             {
                 std::lock_guard lock(otaDisplay.mutex);
                 otaStatus = otaDisplay.status;
+                otaTarget = otaDisplay.target;
                 chunks = otaDisplay.chunksReceived;
                 total = otaDisplay.totalChunks;
                 transferSize = otaDisplay.compressedSize > 0
                     ? otaDisplay.compressedSize
                     : otaDisplay.firmwareSize;
             }
+
+            const char* targetName = (otaTarget == midi2pwm::ota::Target::Stm32) ? "STM32" : "ESP32";
 
             bool showScreen = (otaStatus != midi2pwm::ota::OtaStatus::Idle);
             app->set_ota_screen_visible(showScreen);
@@ -145,22 +151,27 @@ void startUiPollTimer(slint::ComponentHandle<AppWindow> app,
 
                 using Status = midi2pwm::ota::OtaStatus;
                 switch (otaStatus) {
-                case Status::Preparing:
-                    app->set_ota_screen_phase_text(slint::SharedString("Preparing..."));
-                    app->set_ota_screen_detail_text(slint::SharedString("Preparing for update"));
+                case Status::Preparing: {
+                    char phase[48];
+                    std::snprintf(phase, sizeof(phase), "Updating %s...", targetName);
+                    app->set_ota_screen_phase_text(slint::SharedString(phase));
+                    app->set_ota_screen_detail_text(slint::SharedString("Preparing"));
                     app->set_ota_screen_progress(0);
                     break;
+                }
                 case Status::Receiving: {
                     float pct = total > 0 ? 100.f * chunks / total : 0.f;
                     uint32_t bytesReceived = total > 0 ? static_cast<uint32_t>(
                         static_cast<uint64_t>(transferSize) * chunks / total) : 0;
                     uint32_t kbReceived = bytesReceived / 1024;
                     uint32_t kbTotal = transferSize / 1024;
+                    char phase[48];
+                    std::snprintf(phase, sizeof(phase), "Updating %s...", targetName);
                     char detail[32];
                     std::snprintf(detail, sizeof(detail), "%lu / %lu KB",
                                   static_cast<unsigned long>(kbReceived),
                                   static_cast<unsigned long>(kbTotal));
-                    app->set_ota_screen_phase_text(slint::SharedString("Downloading firmware..."));
+                    app->set_ota_screen_phase_text(slint::SharedString(phase));
                     app->set_ota_screen_detail_text(slint::SharedString(detail));
                     app->set_ota_screen_progress(pct);
                     break;
@@ -191,7 +202,8 @@ void startUiPollTimer(slint::ComponentHandle<AppWindow> app,
             }
         }
 
-        if (app->get_ota_screen_visible() && app->get_ota_screen_status() == static_cast<int>(midi2pwm::ota::OtaStatus::Error)) {
+        int otaScreenStatus = app->get_ota_screen_status();
+        if (app->get_ota_screen_visible() && otaScreenStatus == static_cast<int>(midi2pwm::ota::OtaStatus::Error)) {
             if (otaErrorShownAtUs > 0 && (nowUs - otaErrorShownAtUs) > OTA_ERROR_DISPLAY_US) {
                 app->set_ota_screen_visible(false);
                 {
@@ -199,6 +211,19 @@ void startUiPollTimer(slint::ComponentHandle<AppWindow> app,
                     otaDisplay.status = midi2pwm::ota::OtaStatus::Idle;
                 }
                 otaErrorShownAtUs = 0;
+            }
+        }
+
+        if (app->get_ota_screen_visible() && otaScreenStatus == static_cast<int>(midi2pwm::ota::OtaStatus::Rebooting)) {
+            if (!otaRebootWaitingForReconnect) {
+                otaRebootWaitingForReconnect = true;
+            } else if (telemetryChanged) {
+                app->set_ota_screen_visible(false);
+                {
+                    std::lock_guard lock(otaDisplay.mutex);
+                    otaDisplay.status = midi2pwm::ota::OtaStatus::Idle;
+                }
+                otaRebootWaitingForReconnect = false;
             }
         }
     });

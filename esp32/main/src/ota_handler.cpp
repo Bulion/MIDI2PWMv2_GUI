@@ -72,11 +72,19 @@ static void otaTouchActivity()
     s_lastOtaActivityUs.store(esp_timer_get_time(), std::memory_order_release);
 }
 
+static void onStm32OtaBegin(const midi2pwm::ota::OtaBegin &msg);
+
 static void onOtaBegin(const midi2pwm::ota::OtaBegin &msg)
 {
+    if (msg.target() == midi2pwm::ota::Target::Stm32) {
+        onStm32OtaBegin(msg);
+        return;
+    }
+
     otaTouchActivity();
     {
         std::lock_guard lock(s_otaDisplay.mutex);
+        s_otaDisplay.target = midi2pwm::ota::Target::Esp32;
         s_otaDisplay.compressedSize = msg.compressed_size();
         s_otaDisplay.firmwareSize = msg.firmware_size();
         s_otaDisplay.totalChunks = msg.total_chunks();
@@ -121,6 +129,39 @@ static void onOtaAbort(const midi2pwm::ota::OtaAbort &msg)
     s_otaDisplay.version.fetch_add(1, std::memory_order_release);
 }
 
+static void onStm32OtaBegin(const midi2pwm::ota::OtaBegin &msg)
+{
+    if (msg.target() != midi2pwm::ota::Target::Stm32) {
+        return;
+    }
+
+    {
+        std::lock_guard lock(s_otaDisplay.mutex);
+        s_otaDisplay.target = midi2pwm::ota::Target::Stm32;
+        s_otaDisplay.firmwareSize = msg.firmware_size();
+        s_otaDisplay.compressedSize = msg.compressed_size();
+        s_otaDisplay.totalChunks = msg.total_chunks();
+        s_otaDisplay.chunksReceived = 0;
+        s_otaDisplay.status = midi2pwm::ota::OtaStatus::Preparing;
+    }
+    s_otaDisplay.version.fetch_add(1, std::memory_order_release);
+}
+
+static void onStm32OtaProgress(const midi2pwm::ota::OtaProgress &progress)
+{
+    if (progress.target() != midi2pwm::ota::Target::Stm32) {
+        return;
+    }
+
+    {
+        std::lock_guard lock(s_otaDisplay.mutex);
+        s_otaDisplay.status = progress.status();
+        s_otaDisplay.chunksReceived = progress.chunks_received();
+        s_otaDisplay.totalChunks = progress.total_chunks();
+    }
+    s_otaDisplay.version.fetch_add(1, std::memory_order_release);
+}
+
 } // namespace
 
 void initOtaHandler(gui::common::ConnectionViewModel &vm, UartBackend &backend)
@@ -141,6 +182,8 @@ void registerOtaCallbacks(gui::common::MessageProcessor &msgProc)
         gui::common::MessageProcessor::OtaEndCallback::create<&onOtaEnd>());
     msgProc.setOtaAbortCallback(
         gui::common::MessageProcessor::OtaAbortCallback::create<&onOtaAbort>());
+    msgProc.setOtaProgressCallback(
+        gui::common::MessageProcessor::OtaProgressCallback::create<&onStm32OtaProgress>());
 }
 
 void checkOtaDataTimeout()
