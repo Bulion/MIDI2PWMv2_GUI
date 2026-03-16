@@ -80,11 +80,11 @@ export component ModeSelectionSection inherits VerticalLayout {
         }
     }
 
-    if root.mode_config.mode_type != 5: HorizontalLayout {
+    HorizontalLayout {
         spacing: AppStyle.spacing_md;
         height: 54px;
 
-        VerticalLayout {
+        if root.mode_config.mode_type != 5: VerticalLayout {
             spacing: AppStyle.spacing_xs;
             Text {
                 text: "Direction";
