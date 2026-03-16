@@ -254,6 +254,8 @@ export component AppWindow inherits Window {
                 root.temp_popup_dirty = false;
                 root.temp_mode_config = {
                     mode_type: root.channel_model[i].mode_type,
+                    polarity: root.channel_model[i].polarity,
+                    release_action: root.channel_model[i].release_action,
                     instant_data: root.channel_model[i].instant_data,
                     ramped_data: root.channel_model[i].ramped_data,
                     pulse_data: root.channel_model[i].pulse_data,

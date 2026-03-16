@@ -90,6 +90,8 @@ struct ChannelData
     bool isActive;
     etl::string<32> fault;
     std::uint8_t mode_type;
+    int polarity;
+    int release_action;
     InstantModeData instant_data;
     RampedModeData ramped_data;
     PulseModeData pulse_data;

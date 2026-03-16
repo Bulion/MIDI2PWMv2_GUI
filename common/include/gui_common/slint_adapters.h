@@ -22,6 +22,8 @@ inline ::ChannelData toSlintChannelData(const gui::common::ChannelData &channelD
     slintChannelData.is_active = channelData.isActive;
     slintChannelData.fault = slint::SharedString(channelData.fault.c_str());
     slintChannelData.mode_type = channelData.mode_type;
+    slintChannelData.polarity = channelData.polarity;
+    slintChannelData.release_action = channelData.release_action;
     slintChannelData.instant_data.on_level = channelData.instant_data.on_level;
     slintChannelData.instant_data.velocity_sensitive = channelData.instant_data.velocity_sensitive;
     slintChannelData.ramped_data.on_level = channelData.ramped_data.on_level;
@@ -65,6 +67,8 @@ inline midi2pwm::pwm::ChannelConfigT buildChannelConfigFromModeConfig(
     config.midpoint = 0.0F;
     config.max_point = 0.0F;
     config.output_mode = static_cast<midi2pwm::pwm::OutputModeType>(modeConfig.mode_type);
+    config.polarity = static_cast<midi2pwm::pwm::Polarity>(modeConfig.polarity);
+    config.release_action = static_cast<midi2pwm::pwm::ReleaseAction>(modeConfig.release_action);
 
     switch (modeConfig.mode_type) {
         case 0: {

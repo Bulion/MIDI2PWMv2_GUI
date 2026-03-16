@@ -10,6 +10,8 @@ import { AppStyle } from "style.slint";
 
 export struct ModeConfig {
     mode_type: int,
+    polarity: int,
+    release_action: int,
     instant_data: InstantModeData,
     ramped_data: RampedModeData,
     pulse_data: PulseModeData,
@@ -22,6 +24,8 @@ export struct ModeConfig {
 export component ModeSelectionSection inherits VerticalLayout {
     in-out property <ModeConfig> mode_config: {
         mode_type: 0,
+        polarity: 0,
+        release_action: 0,
         instant_data: { on_level: 255, velocity_sensitive: true },
         ramped_data: { on_level: 255, velocity_sensitive: true, attack_time_ms: 100, release_time_ms: 100 },
         pulse_data: { on_level: 255, velocity_sensitive: true, attack_time_ms: 10, hold_time_ms: 100, release_time_ms: 50 },
@@ -73,6 +77,57 @@ export component ModeSelectionSection inherits VerticalLayout {
                 root.mode_config.mode_type = 6;
             }
             root.mode_changed();
+        }
+    }
+
+    if root.mode_config.mode_type != 5: HorizontalLayout {
+        spacing: AppStyle.spacing_md;
+        height: 54px;
+
+        VerticalLayout {
+            spacing: AppStyle.spacing_xs;
+            Text {
+                text: "Direction";
+                font-size: AppStyle.font_size_small;
+                color: AppStyle.text_secondary;
+                height: 18px;
+            }
+            ComboBox {
+                height: 30px;
+                model: ["Forward", "Reverse"];
+                current-index: root.mode_config.polarity;
+                selected(val) => {
+                    if (val == "Forward") {
+                        root.mode_config.polarity = 0;
+                    } else {
+                        root.mode_config.polarity = 1;
+                    }
+                    root.mode_changed();
+                }
+            }
+        }
+
+        VerticalLayout {
+            spacing: AppStyle.spacing_xs;
+            Text {
+                text: "Release";
+                font-size: AppStyle.font_size_small;
+                color: AppStyle.text_secondary;
+                height: 18px;
+            }
+            ComboBox {
+                height: 30px;
+                model: ["Active Brake", "Free Float"];
+                current-index: root.mode_config.release_action;
+                selected(val) => {
+                    if (val == "Active Brake") {
+                        root.mode_config.release_action = 0;
+                    } else {
+                        root.mode_config.release_action = 1;
+                    }
+                    root.mode_changed();
+                }
+            }
         }
     }
 

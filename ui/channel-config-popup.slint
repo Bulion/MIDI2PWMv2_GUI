@@ -20,6 +20,8 @@ export component ChannelConfigPopup inherits Rectangle {
 
     in-out property <ModeConfig> mode_config: {
         mode_type: 0,
+        polarity: 0,
+        release_action: 0,
         instant_data: { on_level: 255, velocity_sensitive: true },
         ramped_data: { on_level: 255, velocity_sensitive: true, attack_time_ms: 100, release_time_ms: 100 },
         pulse_data: {

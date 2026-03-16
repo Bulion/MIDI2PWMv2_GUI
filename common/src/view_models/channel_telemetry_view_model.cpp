@@ -95,6 +95,8 @@ void ChannelTelemetryViewModel::updateFromConfig(const midi2pwm::pwm::ChannelCon
         ChannelData &channelData = channels_[channelNumber];
         channelData.note = midiNoteToString(config.note());
         channelData.mode_type = static_cast<std::uint8_t>(config.output_mode());
+        channelData.polarity = static_cast<int>(config.polarity());
+        channelData.release_action = static_cast<int>(config.release_action());
 
         const auto modeParamsType = config.mode_params_type();
         GUI_LOG_INFO(TAG, "Config ch=%u: mode=%u params_type=%u note=%u",
@@ -198,6 +200,8 @@ void ChannelTelemetryViewModel::clear()
             channelData.isActive = false;
             channelData.fault = "";
             channelData.mode_type = 0;
+            channelData.polarity = 0;
+            channelData.release_action = 0;
             channelData.instant_data = {100.0F, true};
             channelData.ramped_data = {100.0F, true, 100, 100};
             channelData.pulse_data = {100.0F, true, 10, 100, 50};
