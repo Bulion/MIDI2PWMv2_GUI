@@ -24,19 +24,16 @@ export component CCControlModeParams inherits VerticalLayout {
 
     in-out property <bool> is_assigning_cc: false;
 
-    in-out property <float> cc_number_value: root.data.cc_number;
     in-out property <float> center_value_value: root.data.center_value;
     in-out property <float> left_pwm_value: root.data.left_max_pwm;
     in-out property <float> right_pwm_value: root.data.right_max_pwm;
     in-out property <float> deadband_value: root.data.deadband_range;
 
-    private property <bool> ignore_cc_number_changes: false;
     private property <bool> ignore_center_value_changes: false;
     private property <bool> ignore_left_pwm_changes: false;
     private property <bool> ignore_right_pwm_changes: false;
     private property <bool> ignore_deadband_changes: false;
 
-    private property <int> cc_number_target: -1;
     private property <int> center_value_target: -1;
     private property <int> left_pwm_target: -1;
     private property <int> right_pwm_target: -1;
@@ -49,11 +46,9 @@ export component CCControlModeParams inherits VerticalLayout {
 
     changed confirmed_field => {
         if (root.confirmed_value >= 0) {
-            if (root.confirmed_field == "cc_number") {
-                ignore_cc_number_changes = true;
-                cc_number_target = root.confirmed_value;
+            if (root.confirmed_field == "cc_manual") {
                 root.data.cc_number = root.confirmed_value;
-                cc_number_value = root.confirmed_value;
+                root.is_assigning_cc = false;
                 root.changed();
             } else if (root.confirmed_field == "cc_center") {
                 ignore_center_value_changes = true;
@@ -100,12 +95,11 @@ export component CCControlModeParams inherits VerticalLayout {
         }
     }
 
-    HorizontalLayout {
+    if !root.is_assigning_cc: HorizontalLayout {
         spacing: AppStyle.spacing_md;
 
         Button {
             text: "Assign CC";
-            enabled: !root.is_assigning_cc;
             clicked => {
                 root.assign_cc();
                 root.is_assigning_cc = true;
@@ -114,39 +108,32 @@ export component CCControlModeParams inherits VerticalLayout {
 
         Button {
             text: "Reset CC";
-            enabled: !root.is_assigning_cc;
             clicked => {
                 root.reset_cc();
             }
         }
     }
 
-    Rectangle {
-        height: 8px;
-    }
+    if root.is_assigning_cc: HorizontalLayout {
+        spacing: AppStyle.spacing_md;
 
-    SliderWithPopup {
-        label: "CC Number";
-        minimum: 0;
-        maximum: 127;
-        value <=> root.cc_number_value;
-        quick_buttons: [1, 64, 127];
-        field_name: "cc_number";
-        request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals) => {
-            ignore_cc_number_changes = false;
-            root.request_numeric_input(min, max, val, label, suffix, buttons, field, max_decimals);
-        }
-        changed(new_value) => {
-            if (root.ignore_cc_number_changes) {
-                if (Math.abs(new_value - root.cc_number_target) < 5) {
-                    ignore_cc_number_changes = false;
-                    cc_number_target = -1;
-                }
-            } else {
-                root.data.cc_number = new_value;
-                root.changed();
+        Button {
+            text: "Manual";
+            clicked => {
+                root.request_numeric_input(0, 127, root.data.cc_number, "CC Number", "", [1, 64, 127], "cc_manual", 0);
             }
         }
+
+        Button {
+            text: "Cancel";
+            clicked => {
+                root.is_assigning_cc = false;
+            }
+        }
+    }
+
+    Rectangle {
+        height: 8px;
     }
 
     SliderWithPopup {
