@@ -359,7 +359,7 @@ Slint for MCUs uses a pure CPU software renderer with significant performance li
 
 #### CRITICAL - NEVER USE (Very Expensive):
 1. **Complex Gradients**: Linear gradients with border-radius are extremely expensive
-2. **Circular Gradients**: NOT SUPPORTED in software renderer
+2. **Radial Gradients**: Supported since Slint 1.13 on the software renderer (`@radial-gradient(circle, ...)`), but expensive — use sparingly and avoid combining with border-radius
 3. **Shadows**: Require multiple render passes with blending
 4. **Trigonometric Calculations**: `Math.sin()`, `Math.cos()` in property bindings per frame
 5. **For Loops Creating Many Elements**: Creates 10+ rectangles with computed positions
