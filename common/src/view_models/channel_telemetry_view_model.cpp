@@ -37,37 +37,8 @@ void ChannelTelemetryViewModel::updateFromTelemetry(const midi2pwm::pwm::Channel
         channelData.currentMa = telemetry.current() * 1000.0F;
         channelData.isActive = (telemetry.status() == midi2pwm::pwm::ChannelStatus::Active);
         channelData.fault = statusToString(telemetry.status(), telemetry.had_fault());
-
-        if (channelData.isActive) {
-            switch (static_cast<midi2pwm::pwm::OutputModeType>(channelData.mode_type)) {
-            case midi2pwm::pwm::OutputModeType::Instant:
-                channelData.dutyCyclePercent = channelData.instant_data.on_level;
-                break;
-            case midi2pwm::pwm::OutputModeType::Ramped:
-                channelData.dutyCyclePercent = channelData.ramped_data.on_level;
-                break;
-            case midi2pwm::pwm::OutputModeType::Pulse:
-                channelData.dutyCyclePercent = channelData.pulse_data.on_level;
-                break;
-            case midi2pwm::pwm::OutputModeType::Toggle:
-                channelData.dutyCyclePercent = channelData.toggle_data.on_level;
-                break;
-            case midi2pwm::pwm::OutputModeType::ADSR:
-                channelData.dutyCyclePercent = channelData.adsr_data.attack_level;
-                break;
-            case midi2pwm::pwm::OutputModeType::CCControl:
-                channelData.dutyCyclePercent = (channelData.cc_data.left_max_pwm + channelData.cc_data.right_max_pwm) / 2.0F;
-                break;
-            case midi2pwm::pwm::OutputModeType::PitchBend:
-                channelData.dutyCyclePercent = channelData.pitchbend_data.base_level;
-                break;
-            default:
-                channelData.dutyCyclePercent = 0.0F;
-                break;
-            }
-        } else {
-            channelData.dutyCyclePercent = 0.0F;
-        }
+        channelData.dutyCyclePercent = telemetry.duty_cycle() * 100.0F;
+        channelData.polarity = static_cast<int>(telemetry.polarity());
 
         callback = updateCallback_;
     }
