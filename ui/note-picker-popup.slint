@@ -1,0 +1,164 @@
+import { Button } from "std-widgets.slint";
+import { AppStyle } from "style.slint";
+
+export component NotePickerPopup inherits Rectangle {
+    in-out property <int> selected_semitone: 0;
+    in-out property <int> selected_octave: 4;
+
+    private property <int> midi_note: (root.selected_octave + 1) * 12 + root.selected_semitone;
+    private property <bool> is_valid: root.midi_note >= 0 && root.midi_note <= 127;
+
+    private property <[string]> note_names: ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+    private property <[int]> white_semitones: [0, 2, 4, 5, 7, 9, 11];
+    private property <[string]> white_labels: ["C", "D", "E", "F", "G", "A", "B"];
+    private property <[int]> black_semitones: [1, 3, 6, 8, 10];
+    private property <[string]> black_labels: ["C#", "D#", "F#", "G#", "A#"];
+    private property <[int]> black_positions: [1, 2, 4, 5, 6];
+
+    callback confirmed(int, string);
+    callback canceled();
+
+    width: AppStyle.popup_numeric_width;
+    height: 340px;
+    background: AppStyle.bg_dialog;
+    border-radius: AppStyle.radius_lg;
+    border-width: AppStyle.border_width_normal;
+    border-color: AppStyle.text_disabled;
+
+    TouchArea { }
+
+    VerticalLayout {
+        padding: AppStyle.spacing_lg;
+        spacing: AppStyle.spacing_md;
+
+        Text {
+            text: root.is_valid ? (root.note_names[root.selected_semitone] + root.selected_octave + "  (MIDI " + root.midi_note + ")") : "Invalid";
+            font-size: AppStyle.font_size_heading_sm;
+            color: root.is_valid ? AppStyle.text_primary : AppStyle.status_error;
+            horizontal-alignment: center;
+            height: 30px;
+        }
+
+        keyboard := Rectangle {
+            private property <length> wk_w: self.width / 7;
+            private property <length> bk_w: wk_w * 0.65;
+            private property <length> bk_h: self.height * 0.6;
+
+            height: self.width / 7 * 2.5;
+
+            for i in 7: Rectangle {
+                x: i * keyboard.wk_w;
+                width: keyboard.wk_w;
+                height: parent.height;
+                background: root.selected_semitone == root.white_semitones[i] ? AppStyle.accent_blue : #dddddd;
+                border-width: AppStyle.border_width_thin;
+                border-color: #999999;
+
+                Text {
+                    text: root.white_labels[i];
+                    font-size: AppStyle.font_size_small;
+                    color: root.selected_semitone == root.white_semitones[i] ? AppStyle.text_primary : #222222;
+                    horizontal-alignment: center;
+                    y: parent.height - self.height - 4px;
+                }
+
+                TouchArea {
+                    clicked => {
+                        root.selected_semitone = root.white_semitones[i];
+                    }
+                }
+            }
+
+            for i in 5: Rectangle {
+                x: root.black_positions[i] * keyboard.wk_w - keyboard.bk_w / 2;
+                y: 0px;
+                width: keyboard.bk_w;
+                height: keyboard.bk_h;
+                background: root.selected_semitone == root.black_semitones[i] ? AppStyle.accent_blue : #222222;
+                border-width: AppStyle.border_width_thin;
+                border-color: #000000;
+
+                Text {
+                    text: root.black_labels[i];
+                    font-size: AppStyle.font_size_tiny;
+                    color: root.selected_semitone == root.black_semitones[i] ? AppStyle.text_primary : #cccccc;
+                    horizontal-alignment: center;
+                    y: parent.height - self.height - 4px;
+                }
+
+                TouchArea {
+                    clicked => {
+                        root.selected_semitone = root.black_semitones[i];
+                    }
+                }
+            }
+        }
+
+        VerticalLayout {
+            spacing: AppStyle.spacing_xs;
+
+            Text {
+                text: "Octave";
+                font-size: AppStyle.font_size_small;
+                color: AppStyle.text_tertiary;
+                horizontal-alignment: center;
+            }
+
+            HorizontalLayout {
+                spacing: 2px;
+                height: 36px;
+
+                for oct in 11: Rectangle {
+                    private property <int> octave_value: oct - 1;
+                    private property <bool> oct_selected: root.selected_octave == octave_value;
+                    private property <bool> oct_valid: (octave_value + 1) * 12 + root.selected_semitone >= 0 && (octave_value + 1) * 12 + root.selected_semitone <= 127;
+
+                    background: oct_selected ? AppStyle.accent_blue : (oct_valid ? AppStyle.bg_input : AppStyle.bg_button);
+                    border-width: AppStyle.border_width_thin;
+                    border-color: AppStyle.border_default;
+
+                    Text {
+                        text: octave_value;
+                        font-size: AppStyle.font_size_small;
+                        color: oct_selected ? AppStyle.text_primary : (oct_valid ? AppStyle.text_secondary : AppStyle.text_disabled);
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    TouchArea {
+                        clicked => {
+                            if (oct_valid) {
+                                root.selected_octave = octave_value;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Rectangle { }
+
+        HorizontalLayout {
+            spacing: AppStyle.spacing_lg;
+            alignment: LayoutAlignment.center;
+
+            Button {
+                text: "OK";
+                width: 100px;
+                enabled: root.is_valid;
+                clicked => {
+                    root.confirmed(root.midi_note,
+                        root.note_names[root.selected_semitone] + root.selected_octave);
+                }
+            }
+
+            Button {
+                text: "Cancel";
+                width: 100px;
+                clicked => {
+                    root.canceled();
+                }
+            }
+        }
+    }
+}

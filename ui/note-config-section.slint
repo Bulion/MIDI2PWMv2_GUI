@@ -7,6 +7,7 @@ export component NoteConfigSection inherits VerticalLayout {
 
     callback assign_note;
     callback reset_note;
+    callback manual_note;
     callback note_changed;
 
     alignment: LayoutAlignment.start;
@@ -36,23 +37,40 @@ export component NoteConfigSection inherits VerticalLayout {
         }
     }
 
-    HorizontalLayout {
+    if !root.is_assigning_note: HorizontalLayout {
         spacing: AppStyle.spacing_md;
 
         Button {
             text: "Assign";
-            enabled: !root.is_assigning_note;
             clicked => {
                 root.assign_note();
+                root.is_assigning_note = true;
             }
         }
 
         Button {
             text: "Reset";
-            enabled: !root.is_assigning_note;
             clicked => {
                 root.reset_note();
                 root.note_changed();
+            }
+        }
+    }
+
+    if root.is_assigning_note: HorizontalLayout {
+        spacing: AppStyle.spacing_md;
+
+        Button {
+            text: "Manual";
+            clicked => {
+                root.manual_note();
+            }
+        }
+
+        Button {
+            text: "Cancel";
+            clicked => {
+                root.is_assigning_note = false;
             }
         }
     }

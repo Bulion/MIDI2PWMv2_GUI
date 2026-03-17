@@ -1,6 +1,7 @@
 import { Button } from "std-widgets.slint";
 import { ConfirmDialog } from "confirm-dialog.slint";
 import { NoteConfigSection } from "note-config-section.slint";
+import { NotePickerPopup } from "note-picker-popup.slint";
 import { FaultStatusSection } from "fault-status-section.slint";
 import { ModeSelectionSection, ModeConfig } from "mode-selection-section.slint";
 import { AppStyle } from "style.slint";
@@ -46,6 +47,7 @@ export component ChannelConfigPopup inherits Rectangle {
 
     callback assign_note;
     callback reset_note;
+    callback manual_note_selected(string);
     callback reset_fault;
     callback assign_cc;
     callback reset_cc;
@@ -54,6 +56,7 @@ export component ChannelConfigPopup inherits Rectangle {
     callback request_numeric_input(float, float, float, string, string, [float], string, int);
 
     private property <bool> show_confirm_dialog: false;
+    private property <bool> show_note_picker: false;
 
     width: AppStyle.popup_config_width;
     height: AppStyle.popup_config_height;
@@ -132,6 +135,10 @@ export component ChannelConfigPopup inherits Rectangle {
                         root.reset_note();
                     }
 
+                    manual_note => {
+                        root.show_note_picker = true;
+                    }
+
                     note_changed => {
                         root.is_dirty = true;
                     }
@@ -172,6 +179,33 @@ export component ChannelConfigPopup inherits Rectangle {
                 mode-changed => {
                     root.is_dirty = true;
                 }
+            }
+        }
+    }
+
+    Rectangle {
+        visible: root.show_note_picker;
+        z: 200;
+        x: 0px;
+        y: 0px;
+        width: parent.width;
+        height: parent.height;
+        background: AppStyle.overlay_backdrop;
+
+        NotePickerPopup {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+
+            confirmed(midi_note, note_name) => {
+                root.note = note_name;
+                root.is_assigning_note = false;
+                root.is_dirty = true;
+                root.show_note_picker = false;
+                root.manual_note_selected(note_name);
+            }
+
+            canceled => {
+                root.show_note_picker = false;
             }
         }
     }
