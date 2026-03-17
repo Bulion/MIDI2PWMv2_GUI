@@ -41,6 +41,10 @@ void CommLoop::runOnce()
                 if (!vm_.sendChannelConfig(c.config)) {
                     GUI_LOG_ERROR(TAG, "Failed to send channel config");
                 }
+            } else if constexpr (std::is_same_v<T, ResetFaultCmd>) {
+                if (!vm_.sendFaultReset(c.channelNumber)) {
+                    GUI_LOG_ERROR(TAG, "Failed to send fault reset for channel %u", c.channelNumber);
+                }
             } else if constexpr (std::is_same_v<T, RefreshPortsCmd>) {
                 vm_.refreshPorts();
             }

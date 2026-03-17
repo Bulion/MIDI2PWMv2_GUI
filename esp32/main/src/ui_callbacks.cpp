@@ -51,6 +51,10 @@ void registerUiCallbacks(slint::ComponentHandle<AppWindow> app,
         app->set_temp_popup_dirty(true);
     });
 
+    app->on_reset_fault_clicked([&commLoop](int channelIdx) {
+        commLoop.post(gui::common::CommLoop::ResetFaultCmd{static_cast<std::uint16_t>(channelIdx)});
+    });
+
     app->on_popup_closed([&assignState, app]() {
         if (assignState.isAssigningNote.load()) {
             assignState.isAssigningNote.store(false);

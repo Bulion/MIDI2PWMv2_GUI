@@ -202,6 +202,13 @@ bool MessageProcessor::sendChannelConfig(const midi2pwm::pwm::ChannelConfigT &co
     return result;
 }
 
+bool MessageProcessor::sendFaultReset(std::uint16_t channelNumber)
+{
+    auto buffer = libcomm::BuildFaultControlCommand(
+        midi2pwm::pwm::FaultControlOperation::Reset, channelNumber);
+    return pwmEndpoint_.Send(std::move(buffer));
+}
+
 bool MessageProcessor::sendHeartBeat(bool requestTelemetry, uint16_t epoch)
 {
     GUI_LOG_DEBUG("MessageProcessor", "Sending HeartBeat message (request_telemetry=%d, epoch=%u)", requestTelemetry, epoch);

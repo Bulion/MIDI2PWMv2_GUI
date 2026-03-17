@@ -361,6 +361,17 @@ bool ConnectionViewModel::sendChannelConfig(const midi2pwm::pwm::ChannelConfigT 
     return messageProcessor_.sendChannelConfig(config);
 }
 
+bool ConnectionViewModel::sendFaultReset(std::uint16_t channelNumber)
+{
+    std::lock_guard<std::mutex> stateLock(viewModelStateMutex_);
+
+    if (!isCurrentlyConnected_) {
+        return false;
+    }
+
+    return messageProcessor_.sendFaultReset(channelNumber);
+}
+
 MessageProcessor &ConnectionViewModel::messageProcessor()
 {
     return messageProcessor_;

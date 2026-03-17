@@ -46,6 +46,7 @@ public:
     void setRawMidiMessageCallback(RawMidiMessageCallback rawMidiCallback);
 
     bool sendChannelConfig(const midi2pwm::pwm::ChannelConfigT &config);
+    bool sendFaultReset(std::uint16_t channelNumber);
     MessageProcessor &messageProcessor();
     void update();
 

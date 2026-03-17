@@ -340,6 +340,10 @@ int main()
         app->set_temp_popup_dirty(true);
     });
 
+    app->on_reset_fault_clicked([&commLoop](int channelIdx) {
+        commLoop.post(gui::common::CommLoop::ResetFaultCmd{static_cast<std::uint16_t>(channelIdx)});
+    });
+
     app->on_popup_closed([&isAssigningNote, &channelAwaitingNote, &isAssigningCc, app]() {
         if (isAssigningNote.load()) {
             isAssigningNote.store(false);

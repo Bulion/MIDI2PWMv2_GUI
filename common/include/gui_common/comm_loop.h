@@ -28,11 +28,16 @@ public:
         midi2pwm::pwm::ChannelConfigT config;
     };
 
+    struct ResetFaultCmd
+    {
+        std::uint16_t channelNumber;
+    };
+
     struct RefreshPortsCmd
     {
     };
 
-    using Command = std::variant<ConnectCmd, DisconnectCmd, SendConfigCmd, RefreshPortsCmd>;
+    using Command = std::variant<ConnectCmd, DisconnectCmd, SendConfigCmd, ResetFaultCmd, RefreshPortsCmd>;
 
     explicit CommLoop(ConnectionViewModel &vm);
 

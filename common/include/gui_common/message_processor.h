@@ -55,6 +55,7 @@ public:
     bool sendMidiChannelMessage(midi2pwm::midi::ChannelMessageType type,
                                 std::uint8_t channel, std::uint8_t data1, std::uint8_t data2);
     bool sendChannelConfig(const midi2pwm::pwm::ChannelConfigT &config);
+    bool sendFaultReset(std::uint16_t channelNumber);
     bool sendHeartBeat(bool requestTelemetry, uint16_t epoch);
     bool sendOtaBegin(midi2pwm::ota::Target target, std::uint32_t firmwareSize,
                       std::uint32_t firmwareCrc32, const char *versionString,

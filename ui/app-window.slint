@@ -159,6 +159,7 @@ export component AppWindow inherits Window {
     callback assign_cc_clicked();
     callback reset_cc_clicked();
     callback cc_assigned_from_backend(int);
+    callback reset_fault_clicked(int);
     callback popup_closed();
 
     ConnectionScreen {
@@ -352,6 +353,7 @@ export component AppWindow inherits Window {
 
                 reset_fault => {
                     root.temp_fault = "";
+                    root.reset_fault_clicked(root.current_channel_index);
                 }
 
                 save => {
