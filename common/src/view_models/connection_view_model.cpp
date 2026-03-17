@@ -42,6 +42,10 @@ ConnectionViewModel::ConnectionViewModel(ConnectionBackend &connectionBackend,
         create<ConnectionViewModel, &ConnectionViewModel::handleChannelConfigReceived>(*this);
     messageProcessor_.setChannelConfigCallback(channelConfigCallback);
 
+    auto batchConfigCallback = MessageProcessor::BatchConfigCallback::
+        create<ConnectionViewModel, &ConnectionViewModel::handleBatchConfigReceived>(*this);
+    messageProcessor_.setBatchConfigCallback(batchConfigCallback);
+
     auto heartBeatCallback = MessageProcessor::HeartBeatCallback::
         create<ConnectionViewModel, &ConnectionViewModel::handleHeartBeatReceived>(*this);
     messageProcessor_.setHeartBeatCallback(heartBeatCallback);
@@ -246,6 +250,31 @@ void ConnectionViewModel::handleChannelConfigReceived(const midi2pwm::pwm::Chann
     GUI_LOG_INFO("ConnectionVM", "ChannelConfig received for channel %u", config.channel_number());
 
     channelTelemetryViewModelReference_.updateFromConfig(config);
+
+    bool shouldNotifyConnected = false;
+    {
+        std::lock_guard<std::mutex> stateLock(viewModelStateMutex_);
+        lastFrameReceivedMs_ = getTimeMs();
+        if (peerState_ == PeerState::Unknown) {
+            peerState_ = PeerState::Alive;
+            shouldNotifyConnected = true;
+        }
+    }
+
+    if (shouldNotifyConnected) {
+        stateVersion_.fetch_add(1, std::memory_order_release);
+        if (connectionStateChangedCallback_.is_valid()) {
+            connectionStateChangedCallback_(true);
+        }
+    }
+}
+
+void ConnectionViewModel::handleBatchConfigReceived(const midi2pwm::pwm::BatchConfig &batch)
+{
+    GUI_LOG_INFO("ConnectionVM", "BatchConfig received with %u channels",
+                 batch.channels() ? batch.channels()->size() : 0);
+
+    channelTelemetryViewModelReference_.updateFromBatchConfig(batch);
 
     bool shouldNotifyConnected = false;
     {

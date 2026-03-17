@@ -61,7 +61,7 @@ void ChannelTelemetryViewModel::updateFromBatchTelemetry(const midi2pwm::pwm::Ba
     }
 }
 
-void ChannelTelemetryViewModel::updateFromConfig(const midi2pwm::pwm::ChannelConfig &config)
+void ChannelTelemetryViewModel::applyConfigToChannel(const midi2pwm::pwm::ChannelConfig &config)
 {
     const std::uint16_t channelNumber = config.channel_number();
 
@@ -70,93 +70,125 @@ void ChannelTelemetryViewModel::updateFromConfig(const midi2pwm::pwm::ChannelCon
         return;
     }
 
+    ChannelData &channelData = channels_[channelNumber];
+    channelData.note = midiNoteToString(config.note());
+    channelData.mode_type = static_cast<std::uint8_t>(config.output_mode());
+    channelData.polarity = static_cast<int>(config.polarity());
+    channelData.release_action = static_cast<int>(config.release_action());
+
+    const auto modeParamsType = config.mode_params_type();
+    GUI_LOG_INFO(TAG, "Config ch=%u: mode=%u params_type=%u note=%u",
+                 channelNumber, static_cast<unsigned>(config.output_mode()),
+                 static_cast<unsigned>(modeParamsType), config.note());
+
+    if (modeParamsType == midi2pwm::pwm::ModeParametersUnion::InstantModeParams) {
+        const auto *p = config.mode_params_as_InstantModeParams();
+        if (p) {
+            channelData.instant_data.on_level = deviceToUiPercent(p->on_level());
+            channelData.instant_data.velocity_sensitive = p->velocity_sensitive();
+            GUI_LOG_INFO(TAG, "Instant ch=%u: on_level=%.1f%% vel=%d",
+                         channelNumber, channelData.instant_data.on_level,
+                         channelData.instant_data.velocity_sensitive);
+        }
+    } else if (modeParamsType == midi2pwm::pwm::ModeParametersUnion::RampedModeParams) {
+        const auto *p = config.mode_params_as_RampedModeParams();
+        if (p) {
+            channelData.ramped_data.on_level = deviceToUiPercent(p->on_level());
+            channelData.ramped_data.velocity_sensitive = p->velocity_sensitive();
+            channelData.ramped_data.attack_time_ms = p->attack_time_ms();
+            channelData.ramped_data.release_time_ms = p->release_time_ms();
+        }
+    } else if (modeParamsType == midi2pwm::pwm::ModeParametersUnion::PulseModeParams) {
+        const auto *p = config.mode_params_as_PulseModeParams();
+        if (p) {
+            channelData.pulse_data.on_level = deviceToUiPercent(p->on_level());
+            channelData.pulse_data.velocity_sensitive = p->velocity_sensitive();
+            channelData.pulse_data.attack_time_ms = p->attack_time_ms();
+            channelData.pulse_data.hold_time_ms = p->hold_time_ms();
+            channelData.pulse_data.release_time_ms = p->release_time_ms();
+        }
+    } else if (modeParamsType == midi2pwm::pwm::ModeParametersUnion::ToggleModeParams) {
+        const auto *p = config.mode_params_as_ToggleModeParams();
+        if (p) {
+            channelData.toggle_data.on_level = deviceToUiPercent(p->on_level());
+            channelData.toggle_data.velocity_sensitive = p->velocity_sensitive();
+            channelData.toggle_data.debounce_delay_ms = p->debounce_delay_ms();
+        }
+    } else if (modeParamsType == midi2pwm::pwm::ModeParametersUnion::ADSRModeParams) {
+        const auto *p = config.mode_params_as_ADSRModeParams();
+        if (p) {
+            channelData.adsr_data.attack_level = deviceToUiPercent(p->attack_level());
+            channelData.adsr_data.sustain_level = deviceToUiPercent(p->sustain_level());
+            channelData.adsr_data.velocity_sensitive = p->velocity_sensitive();
+            channelData.adsr_data.attack_time_ms = p->attack_time_ms();
+            channelData.adsr_data.decay_time_ms = p->decay_time_ms();
+            channelData.adsr_data.release_time_ms = p->release_time_ms();
+            GUI_LOG_INFO(TAG, "ADSR ch=%u: atk_lvl=%.1f%% sus=%.1f%% atk=%u dec=%u rel=%u",
+                         channelNumber, channelData.adsr_data.attack_level,
+                         channelData.adsr_data.sustain_level,
+                         channelData.adsr_data.attack_time_ms,
+                         channelData.adsr_data.decay_time_ms,
+                         channelData.adsr_data.release_time_ms);
+        } else {
+            GUI_LOG_WARNING(TAG, "ADSR params null for ch=%u", channelNumber);
+        }
+    } else if (modeParamsType == midi2pwm::pwm::ModeParametersUnion::CCControlModeParams) {
+        const auto *p = config.mode_params_as_CCControlModeParams();
+        if (p) {
+            channelData.cc_data.cc_number = p->cc_number();
+            channelData.cc_data.center_value = p->center_value();
+            channelData.cc_data.left_max_pwm = deviceToUiPercent(p->left_max_pwm());
+            channelData.cc_data.right_max_pwm = deviceToUiPercent(p->right_max_pwm());
+            channelData.cc_data.deadband_range = p->deadband_range();
+        }
+    } else if (modeParamsType == midi2pwm::pwm::ModeParametersUnion::PitchBendModeParams) {
+        const auto *p = config.mode_params_as_PitchBendModeParams();
+        if (p) {
+            channelData.pitchbend_data.base_level = deviceToUiPercent(p->base_level());
+            channelData.pitchbend_data.bend_range = deviceToUiPercent(p->bend_range());
+            channelData.pitchbend_data.unipolar = p->unipolar();
+            channelData.pitchbend_data.velocity_sensitive = p->velocity_sensitive();
+        }
+    }
+
+    GUI_LOG_DEBUG(TAG, "Config updated for channel %u: mode=%u, note=%s",
+                  channelNumber, channelData.mode_type, channelData.note.c_str());
+}
+
+void ChannelTelemetryViewModel::updateFromConfig(const midi2pwm::pwm::ChannelConfig &config)
+{
+    UpdateCallback callback;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        applyConfigToChannel(config);
+        callback = updateCallback_;
+    }
+
+    version_.fetch_add(1, std::memory_order_release);
+
+    if (callback.is_valid()) {
+        callback(channels_);
+    }
+}
+
+void ChannelTelemetryViewModel::updateFromBatchConfig(const midi2pwm::pwm::BatchConfig &batch)
+{
+    const auto *channelEntries = batch.channels();
+    if (!channelEntries) {
+        GUI_LOG_WARNING(TAG, "BatchConfig has no channels");
+        return;
+    }
+
     UpdateCallback callback;
     {
         std::lock_guard<std::mutex> lock(mutex_);
 
-        ChannelData &channelData = channels_[channelNumber];
-        channelData.note = midiNoteToString(config.note());
-        channelData.mode_type = static_cast<std::uint8_t>(config.output_mode());
-        channelData.polarity = static_cast<int>(config.polarity());
-        channelData.release_action = static_cast<int>(config.release_action());
-
-        const auto modeParamsType = config.mode_params_type();
-        GUI_LOG_INFO(TAG, "Config ch=%u: mode=%u params_type=%u note=%u",
-                     channelNumber, static_cast<unsigned>(config.output_mode()),
-                     static_cast<unsigned>(modeParamsType), config.note());
-
-        if (modeParamsType == midi2pwm::pwm::ModeParametersUnion::InstantModeParams) {
-            const auto *p = config.mode_params_as_InstantModeParams();
-            if (p) {
-                channelData.instant_data.on_level = deviceToUiPercent(p->on_level());
-                channelData.instant_data.velocity_sensitive = p->velocity_sensitive();
-                GUI_LOG_INFO(TAG, "Instant ch=%u: on_level=%.1f%% vel=%d",
-                             channelNumber, channelData.instant_data.on_level,
-                             channelData.instant_data.velocity_sensitive);
+        for (const auto *config : *channelEntries) {
+            if (!config) {
+                continue;
             }
-        } else if (modeParamsType == midi2pwm::pwm::ModeParametersUnion::RampedModeParams) {
-            const auto *p = config.mode_params_as_RampedModeParams();
-            if (p) {
-                channelData.ramped_data.on_level = deviceToUiPercent(p->on_level());
-                channelData.ramped_data.velocity_sensitive = p->velocity_sensitive();
-                channelData.ramped_data.attack_time_ms = p->attack_time_ms();
-                channelData.ramped_data.release_time_ms = p->release_time_ms();
-            }
-        } else if (modeParamsType == midi2pwm::pwm::ModeParametersUnion::PulseModeParams) {
-            const auto *p = config.mode_params_as_PulseModeParams();
-            if (p) {
-                channelData.pulse_data.on_level = deviceToUiPercent(p->on_level());
-                channelData.pulse_data.velocity_sensitive = p->velocity_sensitive();
-                channelData.pulse_data.attack_time_ms = p->attack_time_ms();
-                channelData.pulse_data.hold_time_ms = p->hold_time_ms();
-                channelData.pulse_data.release_time_ms = p->release_time_ms();
-            }
-        } else if (modeParamsType == midi2pwm::pwm::ModeParametersUnion::ToggleModeParams) {
-            const auto *p = config.mode_params_as_ToggleModeParams();
-            if (p) {
-                channelData.toggle_data.on_level = deviceToUiPercent(p->on_level());
-                channelData.toggle_data.velocity_sensitive = p->velocity_sensitive();
-                channelData.toggle_data.debounce_delay_ms = p->debounce_delay_ms();
-            }
-        } else if (modeParamsType == midi2pwm::pwm::ModeParametersUnion::ADSRModeParams) {
-            const auto *p = config.mode_params_as_ADSRModeParams();
-            if (p) {
-                channelData.adsr_data.attack_level = deviceToUiPercent(p->attack_level());
-                channelData.adsr_data.sustain_level = deviceToUiPercent(p->sustain_level());
-                channelData.adsr_data.velocity_sensitive = p->velocity_sensitive();
-                channelData.adsr_data.attack_time_ms = p->attack_time_ms();
-                channelData.adsr_data.decay_time_ms = p->decay_time_ms();
-                channelData.adsr_data.release_time_ms = p->release_time_ms();
-                GUI_LOG_INFO(TAG, "ADSR ch=%u: atk_lvl=%.1f%% sus=%.1f%% atk=%u dec=%u rel=%u",
-                             channelNumber, channelData.adsr_data.attack_level,
-                             channelData.adsr_data.sustain_level,
-                             channelData.adsr_data.attack_time_ms,
-                             channelData.adsr_data.decay_time_ms,
-                             channelData.adsr_data.release_time_ms);
-            } else {
-                GUI_LOG_WARNING(TAG, "ADSR params null for ch=%u", channelNumber);
-            }
-        } else if (modeParamsType == midi2pwm::pwm::ModeParametersUnion::CCControlModeParams) {
-            const auto *p = config.mode_params_as_CCControlModeParams();
-            if (p) {
-                channelData.cc_data.cc_number = p->cc_number();
-                channelData.cc_data.center_value = p->center_value();
-                channelData.cc_data.left_max_pwm = deviceToUiPercent(p->left_max_pwm());
-                channelData.cc_data.right_max_pwm = deviceToUiPercent(p->right_max_pwm());
-                channelData.cc_data.deadband_range = p->deadband_range();
-            }
-        } else if (modeParamsType == midi2pwm::pwm::ModeParametersUnion::PitchBendModeParams) {
-            const auto *p = config.mode_params_as_PitchBendModeParams();
-            if (p) {
-                channelData.pitchbend_data.base_level = deviceToUiPercent(p->base_level());
-                channelData.pitchbend_data.bend_range = deviceToUiPercent(p->bend_range());
-                channelData.pitchbend_data.unipolar = p->unipolar();
-                channelData.pitchbend_data.velocity_sensitive = p->velocity_sensitive();
-            }
+            applyConfigToChannel(*config);
         }
-
-        GUI_LOG_DEBUG(TAG, "Config updated for channel %u: mode=%u, note=%s",
-                      channelNumber, channelData.mode_type, channelData.note.c_str());
 
         callback = updateCallback_;
     }

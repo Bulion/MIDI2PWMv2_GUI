@@ -23,6 +23,7 @@ public:
     using MidiForwardCallback = etl::delegate<void(const midi2pwm::midi::ChannelMessageT &)>;
     using BatchTelemetryCallback = etl::delegate<void(const midi2pwm::pwm::BatchTelemetry &)>;
     using ChannelConfigCallback = etl::delegate<void(const midi2pwm::pwm::ChannelConfig &)>;
+    using BatchConfigCallback = etl::delegate<void(const midi2pwm::pwm::BatchConfig &)>;
     using HeartBeatCallback = etl::delegate<void(const midi2pwm::pwm::HeartBeat &)>;
     using ResponseCallback = etl::delegate<void(const midi2pwm::pwm::Response &)>;
     using OtaProgressCallback = etl::delegate<void(const midi2pwm::ota::OtaProgress &)>;
@@ -39,6 +40,7 @@ public:
     void setMidiChannelMessageCallback(MidiChannelMessageCallback callback);
     void setBatchTelemetryCallback(BatchTelemetryCallback callback);
     void setChannelConfigCallback(ChannelConfigCallback callback);
+    void setBatchConfigCallback(BatchConfigCallback callback);
     void setHeartBeatCallback(HeartBeatCallback callback);
     void setResponseCallback(ResponseCallback callback);
     void setOtaProgressCallback(OtaProgressCallback callback);
@@ -71,6 +73,7 @@ private:
     void HandleMidiChannelMessage(const midi2pwm::midi::ChannelMessage &message);
     void HandleBatchTelemetry(const midi2pwm::pwm::BatchTelemetry &batch);
     void HandleChannelConfig(const midi2pwm::pwm::ChannelConfig &config);
+    void HandleBatchConfig(const midi2pwm::pwm::BatchConfig &batch);
     void HandleHeartBeat(const midi2pwm::pwm::HeartBeat &heartbeat);
     void HandleResponse(const midi2pwm::pwm::Response &response);
     void HandleOtaProgress(const midi2pwm::ota::OtaProgress &progress);
@@ -87,6 +90,7 @@ private:
     MidiForwardCallback midiForwardCallback_;
     BatchTelemetryCallback batchTelemetryCallback_;
     ChannelConfigCallback channelConfigCallback_;
+    BatchConfigCallback batchConfigCallback_;
     HeartBeatCallback heartBeatCallback_;
     ResponseCallback responseCallback_;
     OtaProgressCallback otaProgressCallback_;

@@ -21,6 +21,9 @@ MessageProcessor::MessageProcessor()
     pwmEndpoint_.OnChannelConfig(
         libcomm::PwmEndpoint::ChannelConfigHandler::create<MessageProcessor, &MessageProcessor::HandleChannelConfig>(*this));
 
+    pwmEndpoint_.OnBatchConfig(
+        libcomm::PwmEndpoint::BatchConfigHandler::create<MessageProcessor, &MessageProcessor::HandleBatchConfig>(*this));
+
     pwmEndpoint_.OnHeartBeat(
         libcomm::PwmEndpoint::HeartBeatHandler::create<MessageProcessor, &MessageProcessor::HandleHeartBeat>(*this));
 
@@ -50,6 +53,9 @@ MessageProcessor::MessageProcessor(WriteCallback writeCallback)
 
     pwmEndpoint_.OnChannelConfig(
         libcomm::PwmEndpoint::ChannelConfigHandler::create<MessageProcessor, &MessageProcessor::HandleChannelConfig>(*this));
+
+    pwmEndpoint_.OnBatchConfig(
+        libcomm::PwmEndpoint::BatchConfigHandler::create<MessageProcessor, &MessageProcessor::HandleBatchConfig>(*this));
 
     pwmEndpoint_.OnHeartBeat(
         libcomm::PwmEndpoint::HeartBeatHandler::create<MessageProcessor, &MessageProcessor::HandleHeartBeat>(*this));
@@ -84,6 +90,11 @@ void MessageProcessor::setBatchTelemetryCallback(BatchTelemetryCallback callback
 void MessageProcessor::setChannelConfigCallback(ChannelConfigCallback callback)
 {
     channelConfigCallback_ = callback;
+}
+
+void MessageProcessor::setBatchConfigCallback(BatchConfigCallback callback)
+{
+    batchConfigCallback_ = callback;
 }
 
 void MessageProcessor::setHeartBeatCallback(HeartBeatCallback callback)
@@ -305,6 +316,15 @@ void MessageProcessor::handleFrame(const std::uint8_t *frame, std::size_t size)
                     } else {
                         GUI_LOG_ERROR("MessageProcessor", "Failed to cast to ChannelConfig");
                     }
+                } else if (message_type == midi2pwm::pwm::Message::BatchConfig) {
+                    auto batch = pwm_envelope->message_as_BatchConfig();
+                    if (batch) {
+                        GUI_LOG_DEBUG("MessageProcessor", "Processing PWM BatchConfig");
+                        HandleBatchConfig(*batch);
+                        return;
+                    } else {
+                        GUI_LOG_ERROR("MessageProcessor", "Failed to cast to BatchConfig");
+                    }
                 } else if (message_type == midi2pwm::pwm::Message::Response) {
                     auto response = pwm_envelope->message_as_Response();
                     if (response) {
@@ -428,6 +448,19 @@ void MessageProcessor::HandleChannelConfig(const midi2pwm::pwm::ChannelConfig &c
     }
 
     channelConfigCallback_(config);
+}
+
+void MessageProcessor::HandleBatchConfig(const midi2pwm::pwm::BatchConfig &batch)
+{
+    GUI_LOG_DEBUG("MessageProcessor", "BatchConfig received: %u channels",
+                  batch.channels() ? batch.channels()->size() : 0);
+
+    if (!batchConfigCallback_.is_valid()) {
+        GUI_LOG_WARNING("MessageProcessor", "BatchConfig callback not registered");
+        return;
+    }
+
+    batchConfigCallback_(batch);
 }
 
 void MessageProcessor::HandleHeartBeat(const midi2pwm::pwm::HeartBeat &heartbeat)

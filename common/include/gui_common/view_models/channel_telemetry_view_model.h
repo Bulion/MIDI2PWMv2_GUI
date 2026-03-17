@@ -113,12 +113,14 @@ public:
     void setUpdateCallback(UpdateCallback callback);
     void updateFromBatchTelemetry(const midi2pwm::pwm::BatchTelemetry &batch);
     void updateFromConfig(const midi2pwm::pwm::ChannelConfig &config);
+    void updateFromBatchConfig(const midi2pwm::pwm::BatchConfig &batch);
     void clear();
 
     ChannelsArray channels() const;
     uint32_t version() const { return version_.load(std::memory_order_acquire); }
 
 private:
+    void applyConfigToChannel(const midi2pwm::pwm::ChannelConfig &config);
     static etl::string<16> midiNoteToString(std::uint16_t noteNumber);
     static etl::string<32> statusToString(midi2pwm::pwm::ChannelStatus status, bool hadFault);
 

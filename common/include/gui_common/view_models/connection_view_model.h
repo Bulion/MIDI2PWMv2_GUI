@@ -60,6 +60,7 @@ private:
     void handleMidiChannelMessageReceived(const midi2pwm::midi::ChannelMessageT &midiChannelMessage);
     void handleBatchTelemetryReceived(const midi2pwm::pwm::BatchTelemetry &batch);
     void handleChannelConfigReceived(const midi2pwm::pwm::ChannelConfig &config);
+    void handleBatchConfigReceived(const midi2pwm::pwm::BatchConfig &batch);
     void handleHeartBeatReceived(const midi2pwm::pwm::HeartBeat &heartbeat);
     void handleResponseReceived(const midi2pwm::pwm::Response &response);
     uint32_t getTimeMs() const;
