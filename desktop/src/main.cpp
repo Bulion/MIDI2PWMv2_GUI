@@ -351,6 +351,7 @@ int main()
         }
     });
 
+    app->set_show_connection_screen(true);
     app->set_midi_message("No midi message received yet");
 
     uint32_t lastConnVersion = 0;
