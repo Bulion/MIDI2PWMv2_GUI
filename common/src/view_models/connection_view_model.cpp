@@ -34,9 +34,9 @@ ConnectionViewModel::ConnectionViewModel(ConnectionBackend &connectionBackend,
         create<ConnectionViewModel, &ConnectionViewModel::handleMidiChannelMessageReceived>(*this);
     messageProcessor_.setMidiChannelMessageCallback(midiChannelMessageCallback);
 
-    auto pwmTelemetryCallback = MessageProcessor::PwmTelemetryCallback::
-        create<ConnectionViewModel, &ConnectionViewModel::handlePwmTelemetryReceived>(*this);
-    messageProcessor_.setPwmTelemetryCallback(pwmTelemetryCallback);
+    auto batchTelemetryCallback = MessageProcessor::BatchTelemetryCallback::
+        create<ConnectionViewModel, &ConnectionViewModel::handleBatchTelemetryReceived>(*this);
+    messageProcessor_.setBatchTelemetryCallback(batchTelemetryCallback);
 
     auto channelConfigCallback = MessageProcessor::ChannelConfigCallback::
         create<ConnectionViewModel, &ConnectionViewModel::handleChannelConfigReceived>(*this);
@@ -216,11 +216,12 @@ void ConnectionViewModel::handleMidiChannelMessageReceived(const midi2pwm::midi:
     }
 }
 
-void ConnectionViewModel::handlePwmTelemetryReceived(const midi2pwm::pwm::ChannelTelemetry &telemetry)
+void ConnectionViewModel::handleBatchTelemetryReceived(const midi2pwm::pwm::BatchTelemetry &batch)
 {
-    GUI_LOG_VERBOSE("ConnectionVM", "Telemetry received for channel %u", telemetry.channel_number());
+    GUI_LOG_VERBOSE("ConnectionVM", "BatchTelemetry received with %u channels",
+                    batch.channels() ? batch.channels()->size() : 0);
 
-    channelTelemetryViewModelReference_.updateFromTelemetry(telemetry);
+    channelTelemetryViewModelReference_.updateFromBatchTelemetry(batch);
 
     bool shouldNotifyConnected = false;
     {

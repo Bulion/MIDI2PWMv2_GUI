@@ -58,7 +58,7 @@ private:
     void handleRawDataFromBackend(const std::uint8_t *receivedData, std::size_t receivedSizeBytes);
     void handleBackendDisconnected();
     void handleMidiChannelMessageReceived(const midi2pwm::midi::ChannelMessageT &midiChannelMessage);
-    void handlePwmTelemetryReceived(const midi2pwm::pwm::ChannelTelemetry &telemetry);
+    void handleBatchTelemetryReceived(const midi2pwm::pwm::BatchTelemetry &batch);
     void handleChannelConfigReceived(const midi2pwm::pwm::ChannelConfig &config);
     void handleHeartBeatReceived(const midi2pwm::pwm::HeartBeat &heartbeat);
     void handleResponseReceived(const midi2pwm::pwm::Response &response);

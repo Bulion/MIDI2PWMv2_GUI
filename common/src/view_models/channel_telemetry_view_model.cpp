@@ -19,12 +19,11 @@ void ChannelTelemetryViewModel::setUpdateCallback(UpdateCallback callback)
     updateCallback_ = callback;
 }
 
-void ChannelTelemetryViewModel::updateFromTelemetry(const midi2pwm::pwm::ChannelTelemetry &telemetry)
+void ChannelTelemetryViewModel::updateFromBatchTelemetry(const midi2pwm::pwm::BatchTelemetry &batch)
 {
-    const std::uint16_t channelNumber = telemetry.channel_number();
-
-    if (channelNumber >= CHANNEL_COUNT) {
-        GUI_LOG_ERROR(TAG, "Invalid channel number: %u", channelNumber);
+    const auto *channelEntries = batch.channels();
+    if (!channelEntries) {
+        GUI_LOG_WARNING(TAG, "BatchTelemetry has no channels");
         return;
     }
 
@@ -32,13 +31,25 @@ void ChannelTelemetryViewModel::updateFromTelemetry(const midi2pwm::pwm::Channel
     {
         std::lock_guard<std::mutex> lock(mutex_);
 
-        ChannelData &channelData = channels_[channelNumber];
-        channelData.voltage = telemetry.voltage();
-        channelData.currentMa = telemetry.current() * 1000.0F;
-        channelData.isActive = (telemetry.status() == midi2pwm::pwm::ChannelStatus::Active);
-        channelData.fault = statusToString(telemetry.status(), telemetry.had_fault());
-        channelData.dutyCyclePercent = telemetry.duty_cycle() * 100.0F;
-        channelData.polarity = static_cast<int>(telemetry.polarity());
+        for (const auto *telemetry : *channelEntries) {
+            if (!telemetry) {
+                continue;
+            }
+
+            const std::uint16_t channelNumber = telemetry->channel_number();
+            if (channelNumber >= CHANNEL_COUNT) {
+                GUI_LOG_ERROR(TAG, "Invalid channel number: %u", channelNumber);
+                continue;
+            }
+
+            ChannelData &channelData = channels_[channelNumber];
+            channelData.voltage = telemetry->voltage();
+            channelData.currentMa = telemetry->current() * 1000.0F;
+            channelData.isActive = (telemetry->status() == midi2pwm::pwm::ChannelStatus::Active);
+            channelData.fault = statusToString(telemetry->status(), telemetry->had_fault());
+            channelData.dutyCyclePercent = telemetry->duty_cycle() * 100.0F;
+            channelData.polarity = static_cast<int>(telemetry->polarity());
+        }
 
         callback = updateCallback_;
     }

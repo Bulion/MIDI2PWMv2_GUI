@@ -111,7 +111,7 @@ public:
     ChannelTelemetryViewModel();
 
     void setUpdateCallback(UpdateCallback callback);
-    void updateFromTelemetry(const midi2pwm::pwm::ChannelTelemetry &telemetry);
+    void updateFromBatchTelemetry(const midi2pwm::pwm::BatchTelemetry &batch);
     void updateFromConfig(const midi2pwm::pwm::ChannelConfig &config);
     void clear();
 

@@ -15,8 +15,8 @@ MessageProcessor::MessageProcessor()
     midiEndpoint_.OnChannelMessage(
         libcomm::MidiEndpoint::ChannelMessageHandler::create<MessageProcessor, &MessageProcessor::HandleMidiChannelMessage>(*this));
 
-    pwmEndpoint_.OnChannelTelemetry(
-        libcomm::PwmEndpoint::ChannelTelemetryHandler::create<MessageProcessor, &MessageProcessor::HandlePwmTelemetry>(*this));
+    pwmEndpoint_.OnBatchTelemetry(
+        libcomm::PwmEndpoint::BatchTelemetryHandler::create<MessageProcessor, &MessageProcessor::HandleBatchTelemetry>(*this));
 
     pwmEndpoint_.OnChannelConfig(
         libcomm::PwmEndpoint::ChannelConfigHandler::create<MessageProcessor, &MessageProcessor::HandleChannelConfig>(*this));
@@ -45,8 +45,8 @@ MessageProcessor::MessageProcessor(WriteCallback writeCallback)
     midiEndpoint_.OnChannelMessage(
         libcomm::MidiEndpoint::ChannelMessageHandler::create<MessageProcessor, &MessageProcessor::HandleMidiChannelMessage>(*this));
 
-    pwmEndpoint_.OnChannelTelemetry(
-        libcomm::PwmEndpoint::ChannelTelemetryHandler::create<MessageProcessor, &MessageProcessor::HandlePwmTelemetry>(*this));
+    pwmEndpoint_.OnBatchTelemetry(
+        libcomm::PwmEndpoint::BatchTelemetryHandler::create<MessageProcessor, &MessageProcessor::HandleBatchTelemetry>(*this));
 
     pwmEndpoint_.OnChannelConfig(
         libcomm::PwmEndpoint::ChannelConfigHandler::create<MessageProcessor, &MessageProcessor::HandleChannelConfig>(*this));
@@ -76,9 +76,9 @@ void MessageProcessor::setMidiChannelMessageCallback(MidiChannelMessageCallback 
     midiChannelCallback_ = callback;
 }
 
-void MessageProcessor::setPwmTelemetryCallback(PwmTelemetryCallback callback)
+void MessageProcessor::setBatchTelemetryCallback(BatchTelemetryCallback callback)
 {
-    pwmTelemetryCallback_ = callback;
+    batchTelemetryCallback_ = callback;
 }
 
 void MessageProcessor::setChannelConfigCallback(ChannelConfigCallback callback)
@@ -278,14 +278,14 @@ void MessageProcessor::handleFrame(const std::uint8_t *frame, std::size_t size)
                 auto message_type = pwm_envelope->message_type();
                 GUI_LOG_DEBUG("MessageProcessor", "PWM message type: %u", static_cast<unsigned>(message_type));
 
-                if (message_type == midi2pwm::pwm::Message::ChannelTelemetry) {
-                    auto telemetry = pwm_envelope->message_as_ChannelTelemetry();
-                    if (telemetry) {
-                        GUI_LOG_DEBUG("MessageProcessor", "Processing PWM ChannelTelemetry");
-                        HandlePwmTelemetry(*telemetry);
+                if (message_type == midi2pwm::pwm::Message::BatchTelemetry) {
+                    auto batch = pwm_envelope->message_as_BatchTelemetry();
+                    if (batch) {
+                        GUI_LOG_DEBUG("MessageProcessor", "Processing PWM BatchTelemetry");
+                        HandleBatchTelemetry(*batch);
                         return;
                     } else {
-                        GUI_LOG_ERROR("MessageProcessor", "Failed to cast to ChannelTelemetry");
+                        GUI_LOG_ERROR("MessageProcessor", "Failed to cast to BatchTelemetry");
                     }
                 } else if (message_type == midi2pwm::pwm::Message::HeartBeat) {
                     auto heartbeat = pwm_envelope->message_as_HeartBeat();
@@ -404,17 +404,17 @@ void MessageProcessor::HandleMidiChannelMessage(const midi2pwm::midi::ChannelMes
     }
 }
 
-void MessageProcessor::HandlePwmTelemetry(const midi2pwm::pwm::ChannelTelemetry &telemetry)
+void MessageProcessor::HandleBatchTelemetry(const midi2pwm::pwm::BatchTelemetry &batch)
 {
-    GUI_LOG_DEBUG("MessageProcessor", "PWM ChannelTelemetry received: channel=%u, voltage=%f, current=%f",
-                  telemetry.channel_number(), telemetry.voltage(), telemetry.current());
+    GUI_LOG_DEBUG("MessageProcessor", "PWM BatchTelemetry received: %u channels",
+                  batch.channels() ? batch.channels()->size() : 0);
 
-    if (!pwmTelemetryCallback_.is_valid()) {
-        GUI_LOG_WARNING("MessageProcessor", "PWM telemetry callback not registered");
+    if (!batchTelemetryCallback_.is_valid()) {
+        GUI_LOG_WARNING("MessageProcessor", "Batch telemetry callback not registered");
         return;
     }
 
-    pwmTelemetryCallback_(telemetry);
+    batchTelemetryCallback_(batch);
 }
 
 void MessageProcessor::HandleChannelConfig(const midi2pwm::pwm::ChannelConfig &config)

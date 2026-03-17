@@ -21,7 +21,7 @@ class MessageProcessor
 public:
     using MidiChannelMessageCallback = etl::delegate<void(const midi2pwm::midi::ChannelMessageT &)>;
     using MidiForwardCallback = etl::delegate<void(const midi2pwm::midi::ChannelMessageT &)>;
-    using PwmTelemetryCallback = etl::delegate<void(const midi2pwm::pwm::ChannelTelemetry &)>;
+    using BatchTelemetryCallback = etl::delegate<void(const midi2pwm::pwm::BatchTelemetry &)>;
     using ChannelConfigCallback = etl::delegate<void(const midi2pwm::pwm::ChannelConfig &)>;
     using HeartBeatCallback = etl::delegate<void(const midi2pwm::pwm::HeartBeat &)>;
     using ResponseCallback = etl::delegate<void(const midi2pwm::pwm::Response &)>;
@@ -37,7 +37,7 @@ public:
     explicit MessageProcessor(WriteCallback writeCallback);
 
     void setMidiChannelMessageCallback(MidiChannelMessageCallback callback);
-    void setPwmTelemetryCallback(PwmTelemetryCallback callback);
+    void setBatchTelemetryCallback(BatchTelemetryCallback callback);
     void setChannelConfigCallback(ChannelConfigCallback callback);
     void setHeartBeatCallback(HeartBeatCallback callback);
     void setResponseCallback(ResponseCallback callback);
@@ -69,7 +69,7 @@ public:
 private:
     static bool NullWrite(const std::uint8_t *, std::size_t);
     void HandleMidiChannelMessage(const midi2pwm::midi::ChannelMessage &message);
-    void HandlePwmTelemetry(const midi2pwm::pwm::ChannelTelemetry &telemetry);
+    void HandleBatchTelemetry(const midi2pwm::pwm::BatchTelemetry &batch);
     void HandleChannelConfig(const midi2pwm::pwm::ChannelConfig &config);
     void HandleHeartBeat(const midi2pwm::pwm::HeartBeat &heartbeat);
     void HandleResponse(const midi2pwm::pwm::Response &response);
@@ -85,7 +85,7 @@ private:
     libcomm::OtaEndpoint otaEndpoint_;
     MidiChannelMessageCallback midiChannelCallback_;
     MidiForwardCallback midiForwardCallback_;
-    PwmTelemetryCallback pwmTelemetryCallback_;
+    BatchTelemetryCallback batchTelemetryCallback_;
     ChannelConfigCallback channelConfigCallback_;
     HeartBeatCallback heartBeatCallback_;
     ResponseCallback responseCallback_;
