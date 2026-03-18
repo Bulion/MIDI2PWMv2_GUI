@@ -86,6 +86,8 @@ export component AppWindow inherits Window {
     background: AppStyle.bg_primary;
 
     in-out property <string> midi_message: "No midi message received yet";
+    in-out property <string> midi_type: "Last MIDI:";
+    in-out property <string> midi_data: "---";
     in-out property <bool> show_connection_screen: false;
     in-out property <bool> waiting_for_device_data: false;
     in-out property <[string]> available_ports: [];
@@ -94,6 +96,8 @@ export component AppWindow inherits Window {
     in-out property <bool> reconnecting_overlay_visible: false;
 
     in-out property <[ChannelData]> channel_model: DefaultModels.channels;
+    in-out property <float> input_voltage: 0.0;
+    in-out property <float> total_current: 0.0;
 
     private property <bool> show_popup: false;
     private property <int> current_channel_index: 0;
@@ -198,12 +202,69 @@ export component AppWindow inherits Window {
         height: parent.height;
         background: transparent;
 
-        Text {
-            x: (parent.width - self.width) / 2;
+        HorizontalLayout {
+            x: 0px;
             y: (parent.height - self.height) / 2;
-            text: root.midi_message;
-            color: AppStyle.text_primary;
-            font-size: AppStyle.font_size_heading;
+            width: parent.width;
+            height: parent.height - 2 * card_height;
+            alignment: LayoutAlignment.stretch;
+
+            VerticalLayout {
+                width: 50%;
+                spacing: AppStyle.spacing_xs;
+                alignment: LayoutAlignment.center;
+
+                Text {
+                    text: "Input voltage:";
+                    color: AppStyle.text_tertiary;
+                    font-size: AppStyle.font_size_small;
+                    horizontal-alignment: center;
+                }
+
+                Text {
+                    text: Math.round(root.input_voltage * 10) / 10 + " V";
+                    color: AppStyle.text_primary;
+                    font-size: AppStyle.font_size_heading;
+                    horizontal-alignment: center;
+                }
+
+                Rectangle { height: AppStyle.spacing_xs; }
+
+                Text {
+                    text: "Overall current:";
+                    color: AppStyle.text_tertiary;
+                    font-size: AppStyle.font_size_small;
+                    horizontal-alignment: center;
+                }
+
+                Text {
+                    text: Math.round(root.total_current * 100) / 100 + " A";
+                    color: AppStyle.text_primary;
+                    font-size: AppStyle.font_size_heading;
+                    horizontal-alignment: center;
+                }
+
+            }
+
+            VerticalLayout {
+                width: 50%;
+                spacing: AppStyle.spacing_sm;
+                alignment: LayoutAlignment.center;
+
+                Text {
+                    text: root.midi_type == "" ? "Last MIDI:" : root.midi_type;
+                    color: AppStyle.text_tertiary;
+                    font-size: AppStyle.font_size_body;
+                    horizontal-alignment: center;
+                }
+
+                Text {
+                    text: root.midi_data == "" ? "---" : root.midi_data;
+                    color: AppStyle.text_primary;
+                    font-size: AppStyle.font_size_heading_sm;
+                    horizontal-alignment: center;
+                }
+            }
         }
 
         for i in 16: ChannelCard {
@@ -236,6 +297,7 @@ export component AppWindow inherits Window {
             width: card_width;
             height: card_height;
             note: root.channel_model.length > i ? root.channel_model[i].note : "";
+            note_number: root.channel_model.length > i ? root.channel_model[i].note_number : 255;
             voltage: root.channel_model.length > i ? root.channel_model[i].voltage : 0.0;
             current: root.channel_model.length > i ? root.channel_model[i].current : 0.0;
             duty_cycle: root.channel_model.length > i ? root.channel_model[i].duty_cycle : 0.0;
@@ -243,6 +305,7 @@ export component AppWindow inherits Window {
             has_fault: root.channel_model.length > i ? (root.channel_model[i].fault == "FAULT" || root.channel_model[i].fault == "HAD_FAULT") : false;
             mode_type: root.channel_model.length > i ? root.channel_model[i].mode_type : 0;
             polarity: root.channel_model.length > i ? root.channel_model[i].polarity : 0;
+            cc_number: root.channel_model.length > i ? root.channel_model[i].cc_data.cc_number : 0;
             invert: row_count == 0;
         }
 

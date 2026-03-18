@@ -60,14 +60,36 @@ component TelemetryRow inherits HorizontalLayout {
     }
 }
 
-component NoteText inherits Text {
-    color: AppStyle.text_tertiary;
-    font-size: AppStyle.font_size_calculator;
-    horizontal-alignment: center;
+component NoteDisplay inherits VerticalLayout {
+    in property <string> note: "";
+    in property <int> note_number: 255;
+    in property <bool> is_cc_mode: false;
+    in property <int> cc_number: 0;
+
+    spacing: 0px;
+
+    Text {
+        text: root.note;
+        color: AppStyle.text_tertiary;
+        font-size: AppStyle.font_size_calculator;
+        horizontal-alignment: center;
+    }
+
+    Text {
+        text: root.note_number <= 127
+            ? (root.is_cc_mode
+                ? ("N: " + root.note_number + " CC: " + root.cc_number)
+                : ("N: " + root.note_number))
+            : "";
+        color: AppStyle.text_primary;
+        font-size: AppStyle.font_size_body_lg;
+        horizontal-alignment: center;
+    }
 }
 
 export component ChannelCard {
     in property <string> note: "E#";
+    in property <int> note_number: 255;
     in property <float> voltage: 20.0;
     in property <float> current: 2300.0;
     in property <float> duty_cycle: 50.0;
@@ -76,6 +98,7 @@ export component ChannelCard {
     in property <bool> invert: false;
     in property <int> mode_type: 0;
     in property <int> polarity: 0;
+    in property <int> cc_number: 0;
     callback clicked;
 
     private property <bool> is_cc_mode: root.mode_type == 5;
@@ -134,8 +157,11 @@ export component ChannelCard {
                 current: root.current_formatted;
             }
 
-            NoteText {
-                text: root.note;
+            NoteDisplay {
+                note: root.note;
+                note_number: root.note_number;
+                is_cc_mode: root.is_cc_mode;
+                cc_number: root.cc_number;
             }
 
             if !root.invert: TelemetryRow {

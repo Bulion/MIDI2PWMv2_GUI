@@ -84,6 +84,7 @@ struct PitchBendModeData
 struct ChannelData
 {
     etl::string<16> note;
+    int noteNumber{255};
     float voltage;
     float currentMa;
     float dutyCyclePercent;
@@ -117,6 +118,8 @@ public:
     void clear();
 
     ChannelsArray channels() const;
+    float inputVoltage() const;
+    float totalCurrentAmps() const;
     uint32_t version() const { return version_.load(std::memory_order_acquire); }
 
 private:
@@ -126,6 +129,8 @@ private:
 
     mutable std::mutex mutex_;
     ChannelsArray channels_;
+    float inputVoltage_{0.0f};
+    float totalCurrentAmps_{0.0f};
     UpdateCallback updateCallback_;
     std::atomic<uint32_t> version_{0};
 };

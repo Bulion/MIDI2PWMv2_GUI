@@ -51,6 +51,14 @@ void ChannelTelemetryViewModel::updateFromBatchTelemetry(const midi2pwm::pwm::Ba
             channelData.polarity = static_cast<int>(telemetry->polarity());
         }
 
+        inputVoltage_ = batch.input_voltage();
+
+        float totalMa = 0.0f;
+        for (const auto &ch : channels_) {
+            totalMa += ch.currentMa;
+        }
+        totalCurrentAmps_ = totalMa / 1000.0f;
+
         callback = updateCallback_;
     }
 
@@ -72,6 +80,7 @@ void ChannelTelemetryViewModel::applyConfigToChannel(const midi2pwm::pwm::Channe
 
     ChannelData &channelData = channels_[channelNumber];
     channelData.note = midiNoteToString(config.note());
+    channelData.noteNumber = static_cast<int>(config.note());
     channelData.mode_type = static_cast<std::uint8_t>(config.output_mode());
     channelData.polarity = static_cast<int>(config.polarity());
     channelData.release_action = static_cast<int>(config.release_action());
@@ -239,6 +248,18 @@ ChannelTelemetryViewModel::ChannelsArray ChannelTelemetryViewModel::channels() c
 {
     std::lock_guard<std::mutex> lock(mutex_);
     return channels_;
+}
+
+float ChannelTelemetryViewModel::inputVoltage() const
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    return inputVoltage_;
+}
+
+float ChannelTelemetryViewModel::totalCurrentAmps() const
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    return totalCurrentAmps_;
 }
 
 etl::string<16> ChannelTelemetryViewModel::midiNoteToString(std::uint16_t noteNumber)

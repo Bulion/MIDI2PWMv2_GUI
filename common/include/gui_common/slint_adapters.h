@@ -16,6 +16,7 @@ inline ::ChannelData toSlintChannelData(const gui::common::ChannelData &channelD
 {
     ::ChannelData slintChannelData;
     slintChannelData.note = slint::SharedString(channelData.note.c_str());
+    slintChannelData.note_number = channelData.noteNumber;
     slintChannelData.voltage = channelData.voltage;
     slintChannelData.current = channelData.currentMa;
     slintChannelData.duty_cycle = channelData.dutyCyclePercent;
