@@ -214,25 +214,26 @@ int main()
             }
         }
 
-        uint32_t telVer = channelTelemetryViewModel.version();
-        if (telVer != lastTelVersion) {
-            lastTelVersion = telVer;
+        if (!channelModel) {
+            channelModel = std::make_shared<slint::VectorModel<ChannelData>>();
             auto channels = channelTelemetryViewModel.channels();
-
-            if (!channelModel) {
-                channelModel = std::make_shared<slint::VectorModel<ChannelData>>();
-                for (const auto &ch : channels) {
-                    channelModel->push_back(gui::common::toSlintChannelData(ch));
-                }
-                app->set_channel_model(channelModel);
-            } else {
-                for (std::size_t i = 0; i < channels.size(); ++i) {
-                    channelModel->set_row_data(i, gui::common::toSlintChannelData(channels[i]));
+            for (const auto &ch : channels) {
+                channelModel->push_back(gui::common::toSlintChannelData(ch));
+            }
+            app->set_channel_model(channelModel);
+        } else {
+            for (std::size_t i = 0; i < 16; ++i) {
+                if (channelTelemetryViewModel.isChannelDirty(i)) {
+                    channelModel->set_row_data(i, gui::common::toSlintChannelData(channelTelemetryViewModel.channel(i)));
+                    channelTelemetryViewModel.clearChannelDirty(i);
                 }
             }
+        }
 
+        if (channelTelemetryViewModel.isGlobalDirty()) {
             app->set_input_voltage(channelTelemetryViewModel.inputVoltage());
             app->set_total_current(channelTelemetryViewModel.totalCurrentAmps());
+            channelTelemetryViewModel.clearGlobalDirty();
         }
 
         uint32_t midiVer = midiViewModel.version();

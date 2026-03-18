@@ -118,8 +118,13 @@ public:
     void clear();
 
     ChannelsArray channels() const;
+    ChannelData channel(std::size_t index) const;
+    bool isChannelDirty(std::size_t index) const;
+    void clearChannelDirty(std::size_t index);
     float inputVoltage() const;
     float totalCurrentAmps() const;
+    bool isGlobalDirty() const;
+    void clearGlobalDirty();
     uint32_t version() const { return version_.load(std::memory_order_acquire); }
 
 private:
@@ -129,6 +134,8 @@ private:
 
     mutable std::mutex mutex_;
     ChannelsArray channels_;
+    std::array<bool, CHANNEL_COUNT> channelDirty_{};
+    bool globalDirty_{false};
     float inputVoltage_{0.0f};
     float totalCurrentAmps_{0.0f};
     UpdateCallback updateCallback_;

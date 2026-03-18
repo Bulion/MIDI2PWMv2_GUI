@@ -65,27 +65,29 @@ void startUiPollTimer(slint::ComponentHandle<AppWindow> app,
             }
         }
 
-        uint32_t telVer = telVm.version();
-        bool telemetryChanged = (telVer != lastTelVersion);
-        if (telemetryChanged) {
-            lastTelVersion = telVer;
+        if (!channelModel) {
+            channelModel = std::make_shared<slint::VectorModel<ChannelData>>();
             auto channels = telVm.channels();
-
-            if (!channelModel) {
-                channelModel = std::make_shared<slint::VectorModel<ChannelData>>();
-                for (const auto &ch : channels) {
-                    channelModel->push_back(gui::common::toSlintChannelData(ch));
-                }
-                app->set_channel_model(channelModel);
-            } else {
-                for (std::size_t i = 0; i < channels.size(); ++i) {
-                    channelModel->set_row_data(i, gui::common::toSlintChannelData(channels[i]));
+            for (const auto &ch : channels) {
+                channelModel->push_back(gui::common::toSlintChannelData(ch));
+            }
+            app->set_channel_model(channelModel);
+        } else {
+            for (std::size_t i = 0; i < 16; ++i) {
+                if (telVm.isChannelDirty(i)) {
+                    channelModel->set_row_data(i, gui::common::toSlintChannelData(telVm.channel(i)));
+                    telVm.clearChannelDirty(i);
                 }
             }
+        }
 
+        if (telVm.isGlobalDirty()) {
             app->set_input_voltage(telVm.inputVoltage());
             app->set_total_current(telVm.totalCurrentAmps());
+            telVm.clearGlobalDirty();
         }
+
+        lastTelVersion = telVm.version();
 
         uint32_t midiVer = midiVm.version();
         if (midiVer != lastMidiVersion) {
@@ -222,7 +224,7 @@ void startUiPollTimer(slint::ComponentHandle<AppWindow> app,
         if (app->get_ota_screen_visible() && otaScreenStatus == static_cast<int>(midi2pwm::ota::OtaStatus::Rebooting)) {
             if (!otaRebootWaitingForReconnect) {
                 otaRebootWaitingForReconnect = true;
-            } else if (telemetryChanged) {
+            } else if (telVm.version() != lastTelVersion) {
                 app->set_ota_screen_visible(false);
                 {
                     std::lock_guard lock(otaDisplay.mutex);

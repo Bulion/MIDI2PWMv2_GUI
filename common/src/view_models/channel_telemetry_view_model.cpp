@@ -43,21 +43,43 @@ void ChannelTelemetryViewModel::updateFromBatchTelemetry(const midi2pwm::pwm::Ba
             }
 
             ChannelData &channelData = channels_[channelNumber];
-            channelData.voltage = telemetry->voltage();
-            channelData.currentMa = telemetry->current() * 1000.0F;
-            channelData.isActive = (telemetry->status() == midi2pwm::pwm::ChannelStatus::Active);
-            channelData.fault = statusToString(telemetry->status(), telemetry->had_fault());
-            channelData.dutyCyclePercent = telemetry->duty_cycle() * 100.0F;
-            channelData.polarity = static_cast<int>(telemetry->polarity());
+
+            float newVoltage = telemetry->voltage();
+            float newCurrentMa = telemetry->current() * 1000.0F;
+            bool newIsActive = (telemetry->status() == midi2pwm::pwm::ChannelStatus::Active);
+            auto newFault = statusToString(telemetry->status(), telemetry->had_fault());
+            float newDutyCycle = telemetry->duty_cycle() * 100.0F;
+            int newPolarity = static_cast<int>(telemetry->polarity());
+
+            if (channelData.voltage != newVoltage
+                || channelData.currentMa != newCurrentMa
+                || channelData.isActive != newIsActive
+                || channelData.fault != newFault
+                || channelData.dutyCyclePercent != newDutyCycle
+                || channelData.polarity != newPolarity) {
+
+                channelData.voltage = newVoltage;
+                channelData.currentMa = newCurrentMa;
+                channelData.isActive = newIsActive;
+                channelData.fault = newFault;
+                channelData.dutyCyclePercent = newDutyCycle;
+                channelData.polarity = newPolarity;
+                channelDirty_[channelNumber] = true;
+            }
         }
 
-        inputVoltage_ = batch.input_voltage();
-
+        float newInputVoltage = batch.input_voltage();
         float totalMa = 0.0f;
         for (const auto &ch : channels_) {
             totalMa += ch.currentMa;
         }
-        totalCurrentAmps_ = totalMa / 1000.0f;
+        float newTotalCurrentAmps = totalMa / 1000.0f;
+
+        if (inputVoltage_ != newInputVoltage || totalCurrentAmps_ != newTotalCurrentAmps) {
+            inputVoltage_ = newInputVoltage;
+            totalCurrentAmps_ = newTotalCurrentAmps;
+            globalDirty_ = true;
+        }
 
         callback = updateCallback_;
     }
@@ -160,6 +182,8 @@ void ChannelTelemetryViewModel::applyConfigToChannel(const midi2pwm::pwm::Channe
         }
     }
 
+    channelDirty_[channelNumber] = true;
+
     GUI_LOG_DEBUG(TAG, "Config updated for channel %u: mode=%u, note=%s",
                   channelNumber, channelData.mode_type, channelData.note.c_str());
 }
@@ -215,6 +239,9 @@ void ChannelTelemetryViewModel::clear()
     {
         std::lock_guard<std::mutex> lock(mutex_);
 
+        channelDirty_.fill(true);
+        globalDirty_ = true;
+
         for (auto &channelData : channels_) {
             channelData.note = "---";
             channelData.voltage = 0.0F;
@@ -250,6 +277,24 @@ ChannelTelemetryViewModel::ChannelsArray ChannelTelemetryViewModel::channels() c
     return channels_;
 }
 
+ChannelData ChannelTelemetryViewModel::channel(std::size_t index) const
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    return channels_[index];
+}
+
+bool ChannelTelemetryViewModel::isChannelDirty(std::size_t index) const
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    return channelDirty_[index];
+}
+
+void ChannelTelemetryViewModel::clearChannelDirty(std::size_t index)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    channelDirty_[index] = false;
+}
+
 float ChannelTelemetryViewModel::inputVoltage() const
 {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -260,6 +305,18 @@ float ChannelTelemetryViewModel::totalCurrentAmps() const
 {
     std::lock_guard<std::mutex> lock(mutex_);
     return totalCurrentAmps_;
+}
+
+bool ChannelTelemetryViewModel::isGlobalDirty() const
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    return globalDirty_;
+}
+
+void ChannelTelemetryViewModel::clearGlobalDirty()
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    globalDirty_ = false;
 }
 
 etl::string<16> ChannelTelemetryViewModel::midiNoteToString(std::uint16_t noteNumber)
