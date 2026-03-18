@@ -24,10 +24,16 @@ void MidiMessageViewModel::updateFromChannelMessage(const midi2pwm::midi::Channe
 
     GUI_LOG_INFO(TAG, "Formatted message: %s", text.c_str());
 
+    MessageString typeLine;
+    MessageString dataLine;
+    FormatLines(message, typeLine, dataLine);
+
     UpdateCallback callback;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         last_message_ = text;
+        last_type_line_ = typeLine;
+        last_data_line_ = dataLine;
         last_raw_message_ = message;
         callback = update_callback_;
     }
@@ -49,6 +55,8 @@ void MidiMessageViewModel::clear()
     {
         std::lock_guard<std::mutex> lock(mutex_);
         last_message_ = "No midi message received yet";
+        last_type_line_ = "Last MIDI:";
+        last_data_line_ = "---";
         last_raw_message_ = {};
         callback = update_callback_;
     }
@@ -64,6 +72,18 @@ MidiMessageViewModel::MessageString MidiMessageViewModel::lastMessage() const
 {
     std::lock_guard<std::mutex> lock(mutex_);
     return last_message_;
+}
+
+MidiMessageViewModel::MessageString MidiMessageViewModel::lastTypeLine() const
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    return last_type_line_;
+}
+
+MidiMessageViewModel::MessageString MidiMessageViewModel::lastDataLine() const
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    return last_data_line_;
 }
 
 midi2pwm::midi::ChannelMessageT MidiMessageViewModel::lastRawMessage() const
@@ -128,6 +148,62 @@ MidiMessageViewModel::MessageString MidiMessageViewModel::ToString(const midi2pw
     }
 
     return msg;
+}
+
+static const char* noteNameFromMidi(uint8_t note)
+{
+    static const char* names[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+    return names[note % 12];
+}
+
+static int octaveFromMidi(uint8_t note)
+{
+    return static_cast<int>(note / 12) - 1;
+}
+
+void MidiMessageViewModel::FormatLines(const midi2pwm::midi::ChannelMessageT &message,
+                                       MessageString &typeLine, MessageString &dataLine)
+{
+    char buf[64];
+
+    switch (message.message_type) {
+    case midi2pwm::midi::ChannelMessageType::NoteOn:
+        std::snprintf(buf, sizeof(buf), "Ch %u  NoteOn  Vel %u", message.channel + 1, message.data2);
+        typeLine = buf;
+        std::snprintf(buf, sizeof(buf), "%s%d (%u)", noteNameFromMidi(message.data1), octaveFromMidi(message.data1), message.data1);
+        dataLine = buf;
+        break;
+    case midi2pwm::midi::ChannelMessageType::NoteOff:
+        std::snprintf(buf, sizeof(buf), "Ch %u  NoteOff", message.channel + 1);
+        typeLine = buf;
+        std::snprintf(buf, sizeof(buf), "%s%d (%u)", noteNameFromMidi(message.data1), octaveFromMidi(message.data1), message.data1);
+        dataLine = buf;
+        break;
+    case midi2pwm::midi::ChannelMessageType::ControlChange:
+        std::snprintf(buf, sizeof(buf), "Ch %u  CC", message.channel + 1);
+        typeLine = buf;
+        std::snprintf(buf, sizeof(buf), "CC %u  Val %u", message.data1, message.data2);
+        dataLine = buf;
+        break;
+    case midi2pwm::midi::ChannelMessageType::PitchBend:
+        std::snprintf(buf, sizeof(buf), "Ch %u  PitchBend", message.channel + 1);
+        typeLine = buf;
+        std::snprintf(buf, sizeof(buf), "Value %u", static_cast<unsigned>((message.data2 << 7) | message.data1));
+        dataLine = buf;
+        break;
+    case midi2pwm::midi::ChannelMessageType::ProgramChange:
+        std::snprintf(buf, sizeof(buf), "Ch %u  Program", message.channel + 1);
+        typeLine = buf;
+        std::snprintf(buf, sizeof(buf), "Program %u", message.data1);
+        dataLine = buf;
+        break;
+    default:
+        std::snprintf(buf, sizeof(buf), "Ch %u  MIDI", message.channel + 1);
+        typeLine = buf;
+        std::snprintf(buf, sizeof(buf), "D1=%u D2=%u", message.data1, message.data2);
+        dataLine = buf;
+        break;
+    }
 }
 
 } // namespace gui::common

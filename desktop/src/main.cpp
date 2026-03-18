@@ -230,12 +230,17 @@ int main()
                     channelModel->set_row_data(i, gui::common::toSlintChannelData(channels[i]));
                 }
             }
+
+            app->set_input_voltage(channelTelemetryViewModel.inputVoltage());
+            app->set_total_current(channelTelemetryViewModel.totalCurrentAmps());
         }
 
         uint32_t midiVer = midiViewModel.version();
         if (midiVer != lastMidiVersion) {
             lastMidiVersion = midiVer;
             app->set_midi_message(slint::SharedString(midiViewModel.lastMessage().c_str()));
+            app->set_midi_type(slint::SharedString(midiViewModel.lastTypeLine().c_str()));
+            app->set_midi_data(slint::SharedString(midiViewModel.lastDataLine().c_str()));
 
             auto rawMsg = midiViewModel.lastRawMessage();
 
