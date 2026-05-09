@@ -4,6 +4,7 @@ import { AppStyle } from "style.slint";
 export component NoteConfigSection inherits VerticalLayout {
     in-out property <string> note: "";
     in-out property <bool> is_assigning_note: false;
+    in property <string> section_label: "Note Configuration";
 
     callback assign_note;
     callback reset_note;
@@ -14,7 +15,7 @@ export component NoteConfigSection inherits VerticalLayout {
     spacing: AppStyle.spacing_lg;
 
     Text {
-        text: "Note Configuration";
+        text: root.section_label;
         font-size: AppStyle.font_size_body;
         color: AppStyle.text_primary;
         font-weight: 600;

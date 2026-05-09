@@ -60,6 +60,81 @@ component TelemetryRow inherits HorizontalLayout {
     }
 }
 
+component HalfBridgeHalf inherits VerticalLayout {
+    in property <string> note: "";
+    in property <int> note_number: 255;
+    in property <string> voltage: "";
+    in property <string> current: "";
+    in property <bool> invert: false;
+
+    alignment: LayoutAlignment.space-evenly;
+    spacing: 0px;
+
+    if root.invert: Text {
+        text: root.current;
+        color: AppStyle.text_primary;
+        font-size: AppStyle.font_size_small;
+        horizontal-alignment: center;
+    }
+    if root.invert: Text {
+        text: "mA";
+        color: AppStyle.text_primary;
+        font-size: AppStyle.font_size_tiny;
+        horizontal-alignment: center;
+    }
+    if root.invert: Text {
+        text: root.voltage;
+        color: AppStyle.text_primary;
+        font-size: AppStyle.font_size_small;
+        horizontal-alignment: center;
+    }
+    if root.invert: Text {
+        text: "V";
+        color: AppStyle.text_primary;
+        font-size: AppStyle.font_size_tiny;
+        horizontal-alignment: center;
+    }
+
+    Text {
+        text: root.note;
+        color: AppStyle.text_tertiary;
+        font-size: AppStyle.font_size_body;
+        horizontal-alignment: center;
+    }
+
+    Text {
+        text: root.note_number <= 127 ? ("N: " + root.note_number) : "";
+        color: AppStyle.text_primary;
+        font-size: AppStyle.font_size_small;
+        horizontal-alignment: center;
+    }
+
+    if !root.invert: Text {
+        text: root.voltage;
+        color: AppStyle.text_primary;
+        font-size: AppStyle.font_size_small;
+        horizontal-alignment: center;
+    }
+    if !root.invert: Text {
+        text: "V";
+        color: AppStyle.text_primary;
+        font-size: AppStyle.font_size_tiny;
+        horizontal-alignment: center;
+    }
+    if !root.invert: Text {
+        text: root.current;
+        color: AppStyle.text_primary;
+        font-size: AppStyle.font_size_small;
+        horizontal-alignment: center;
+    }
+    if !root.invert: Text {
+        text: "mA";
+        color: AppStyle.text_primary;
+        font-size: AppStyle.font_size_tiny;
+        horizontal-alignment: center;
+    }
+}
+
 component NoteDisplay inherits VerticalLayout {
     in property <string> note: "";
     in property <int> note_number: 255;
@@ -99,8 +174,14 @@ export component ChannelCard {
     in property <int> mode_type: 0;
     in property <int> polarity: 0;
     in property <int> cc_number: 0;
+    in property <int> configuration: 0;
+    in property <string> note_b: "";
+    in property <int> note_number_b: 255;
+    in property <bool> is_active_a: false;
+    in property <bool> is_active_b: false;
     callback clicked;
 
+    private property <bool> is_half_bridge: root.configuration == 1;
     private property <bool> is_cc_mode: root.mode_type == 5;
     private property <bool> is_reverse: root.invert ? root.polarity != 1 : root.polarity == 1;
     private property <float> effective_duty_cycle: (root.is_active || root.is_cc_mode) ? root.duty_cycle : 0.0;
@@ -133,13 +214,25 @@ export component ChannelCard {
                 height: parent.height;
                 source: root.has_fault
                     ? (root.invert ? @image-url("assets/channel-card-inverted-error.png") : @image-url("assets/channel-card-error.png"))
-                    : root.is_active
+                    : (!root.is_half_bridge && root.is_active)
                         ? (root.invert ? @image-url("assets/channel-card-inverted-active.png") : @image-url("assets/channel-card-active.png"))
                         : (root.invert ? @image-url("assets/channel-card-inverted.png") : @image-url("assets/channel-card.png"));
             }
+
+            if root.is_half_bridge && !root.has_fault && root.is_active_a: Image {
+                width: parent.width;
+                height: parent.height;
+                source: root.invert ? @image-url("assets/channel-card-inverted-active-lhalf.png") : @image-url("assets/channel-card-active-lhalf.png");
+            }
+
+            if root.is_half_bridge && !root.has_fault && root.is_active_b: Image {
+                width: parent.width;
+                height: parent.height;
+                source: root.invert ? @image-url("assets/channel-card-inverted-active-rhalf.png") : @image-url("assets/channel-card-active-rhalf.png");
+            }
         }
 
-        VerticalLayout {
+        if !root.is_half_bridge: VerticalLayout {
             padding: AppStyle.spacing_xs;
             padding-top: !root.invert ? AppStyle.spacing_xs : 35px;
             padding-bottom: root.invert ? AppStyle.spacing_xs : 35px;
@@ -174,6 +267,39 @@ export component ChannelCard {
             if !root.invert: DutyCycleGauge {
                 value: root.effective_duty_cycle;
                 reverse: root.is_reverse;
+            }
+        }
+
+        if root.is_half_bridge: VerticalLayout {
+            padding: AppStyle.spacing_xs;
+            padding-top: !root.invert ? AppStyle.spacing_xs : 35px;
+            padding-bottom: root.invert ? AppStyle.spacing_xs : 35px;
+
+            HorizontalLayout {
+                private property <length> half_width: (AppStyle.card_width - 2 * AppStyle.spacing_xs - 2px) / 2;
+
+                HalfBridgeHalf {
+                    width: parent.half_width;
+                    invert: root.invert;
+                    note: root.note;
+                    note_number: root.note_number;
+                    voltage: root.voltage_formatted;
+                    current: root.current_formatted;
+                }
+
+                Rectangle {
+                    width: 2px;
+                    background: AppStyle.text_disabled;
+                }
+
+                HalfBridgeHalf {
+                    width: parent.half_width;
+                    invert: root.invert;
+                    note: root.note_b;
+                    note_number: root.note_number_b;
+                    voltage: root.voltage_formatted;
+                    current: root.current_formatted;
+                }
             }
         }
     }

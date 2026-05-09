@@ -103,10 +103,13 @@ export component AppWindow inherits Window {
     private property <int> current_channel_index: 0;
 
     in-out property <string> temp_note: "";
-    private property <string> temp_fault: "";
+    in-out property <string> temp_note_b: "";
+    private property <bool> temp_has_fault: false;
     in-out property <bool> temp_is_assigning: false;
+    in-out property <bool> temp_is_assigning_b: false;
     in-out property <bool> temp_is_assigning_cc: false;
     in-out property <bool> temp_popup_dirty: false;
+    private property <int> temp_configuration: 0;
 
     in-out property <ModeConfig> temp_mode_config: {
         mode_type: 0,
@@ -148,6 +151,9 @@ export component AppWindow inherits Window {
     callback assign_note_clicked(int);
     callback reset_note_clicked(int);
     callback note_assigned_from_backend(string);
+    callback assign_note_b_clicked(int);
+    callback reset_note_b_clicked(int);
+    callback note_b_assigned_from_backend(string);
     callback assign_cc_clicked();
     callback reset_cc_clicked();
     callback cc_assigned_from_backend(int);
@@ -275,13 +281,18 @@ export component AppWindow inherits Window {
                 root.show_popup = true;
                 root.current_channel_index = i;
                 root.temp_note = root.channel_model[i].note;
-                root.temp_fault = root.channel_model[i].fault;
+                root.temp_note_b = root.channel_model[i].note_b;
+                root.temp_has_fault = root.channel_model[i].has_fault;
                 root.temp_is_assigning = false;
+                root.temp_is_assigning_b = false;
                 root.temp_popup_dirty = false;
+                root.temp_configuration = root.channel_model[i].configuration;
                 root.temp_mode_config = {
                     mode_type: root.channel_model[i].mode_type,
                     polarity: root.channel_model[i].polarity,
                     release_action: root.channel_model[i].release_action,
+                    configuration: root.channel_model[i].configuration,
+                    note_b: root.channel_model[i].note_b,
                     instant_data: root.channel_model[i].instant_data,
                     ramped_data: root.channel_model[i].ramped_data,
                     pulse_data: root.channel_model[i].pulse_data,
@@ -302,10 +313,15 @@ export component AppWindow inherits Window {
             current: root.channel_model.length > i ? root.channel_model[i].current : 0.0;
             duty_cycle: root.channel_model.length > i ? root.channel_model[i].duty_cycle : 0.0;
             is_active: root.channel_model.length > i ? root.channel_model[i].is_active : false;
-            has_fault: root.channel_model.length > i ? (root.channel_model[i].fault == "FAULT" || root.channel_model[i].fault == "HAD_FAULT") : false;
+            has_fault: root.channel_model.length > i ? root.channel_model[i].has_fault : false;
             mode_type: root.channel_model.length > i ? root.channel_model[i].mode_type : 0;
             polarity: root.channel_model.length > i ? root.channel_model[i].polarity : 0;
             cc_number: root.channel_model.length > i ? root.channel_model[i].cc_data.cc_number : 0;
+            configuration: root.channel_model.length > i ? root.channel_model[i].configuration : 0;
+            note_b: root.channel_model.length > i ? root.channel_model[i].note_b : "";
+            note_number_b: root.channel_model.length > i ? root.channel_model[i].note_number_b : 255;
+            is_active_a: root.channel_model.length > i ? root.channel_model[i].is_active_a : false;
+            is_active_b: root.channel_model.length > i ? root.channel_model[i].is_active_b : false;
             invert: row_count == 0;
         }
 
@@ -337,9 +353,12 @@ export component AppWindow inherits Window {
 
                 channel_index: root.current_channel_index;
                 note <=> root.temp_note;
-                fault: root.temp_fault;
+                note_b <=> root.temp_note_b;
+                has_fault: root.temp_has_fault;
                 is_dirty <=> root.temp_popup_dirty;
                 is_assigning_note <=> root.temp_is_assigning;
+                is_assigning_note_b <=> root.temp_is_assigning_b;
+                configuration <=> root.temp_configuration;
 
                 mode_config <=> root.temp_mode_config;
 
@@ -374,6 +393,19 @@ export component AppWindow inherits Window {
                     root.temp_note = note_name;
                 }
 
+                assign_note_b => {
+                    root.assign_note_b_clicked(root.current_channel_index);
+                }
+
+                reset_note_b => {
+                    root.temp_note_b = "";
+                    root.reset_note_b_clicked(root.current_channel_index);
+                }
+
+                manual_note_b_selected(note_name) => {
+                    root.temp_note_b = note_name;
+                }
+
                 assign_cc => {
                     root.assign_cc_clicked();
                 }
@@ -383,11 +415,13 @@ export component AppWindow inherits Window {
                 }
 
                 reset_fault => {
-                    root.temp_fault = "";
+                    root.temp_has_fault = false;
                     root.reset_fault_clicked(root.current_channel_index);
                 }
 
                 save => {
+                    root.temp_mode_config.note_b = root.temp_note_b;
+                    root.temp_mode_config.configuration = root.temp_configuration;
                     root.save_channel_config(
                         root.current_channel_index,
                         root.temp_note,

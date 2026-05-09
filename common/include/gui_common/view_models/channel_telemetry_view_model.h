@@ -89,10 +89,15 @@ struct ChannelData
     float currentMa;
     float dutyCyclePercent;
     bool isActive;
-    etl::string<32> fault;
+    bool hasFault{false};
     std::uint8_t mode_type;
     int polarity;
     int release_action;
+    int configuration{0};
+    etl::string<16> noteB;
+    int noteNumberB{255};
+    bool isActiveA{false};
+    bool isActiveB{false};
     InstantModeData instant_data;
     RampedModeData ramped_data;
     PulseModeData pulse_data;
@@ -130,7 +135,6 @@ public:
 private:
     void applyConfigToChannel(const midi2pwm::pwm::ChannelConfig &config);
     static etl::string<16> midiNoteToString(std::uint16_t noteNumber);
-    static etl::string<32> statusToString(midi2pwm::pwm::ChannelStatus status, bool hadFault);
 
     mutable std::mutex mutex_;
     ChannelsArray channels_;

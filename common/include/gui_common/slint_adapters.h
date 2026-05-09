@@ -21,10 +21,15 @@ inline ::ChannelData toSlintChannelData(const gui::common::ChannelData &channelD
     slintChannelData.current = channelData.currentMa;
     slintChannelData.duty_cycle = channelData.dutyCyclePercent;
     slintChannelData.is_active = channelData.isActive;
-    slintChannelData.fault = slint::SharedString(channelData.fault.c_str());
+    slintChannelData.has_fault = channelData.hasFault;
     slintChannelData.mode_type = channelData.mode_type;
     slintChannelData.polarity = channelData.polarity;
     slintChannelData.release_action = channelData.release_action;
+    slintChannelData.configuration = channelData.configuration;
+    slintChannelData.note_b = slint::SharedString(channelData.noteB.c_str());
+    slintChannelData.note_number_b = channelData.noteNumberB;
+    slintChannelData.is_active_a = channelData.isActiveA;
+    slintChannelData.is_active_b = channelData.isActiveB;
     slintChannelData.instant_data.on_level = channelData.instant_data.on_level;
     slintChannelData.instant_data.velocity_sensitive = channelData.instant_data.velocity_sensitive;
     slintChannelData.ramped_data.on_level = channelData.ramped_data.on_level;
@@ -58,12 +63,13 @@ inline ::ChannelData toSlintChannelData(const gui::common::ChannelData &channelD
 }
 
 inline midi2pwm::pwm::ChannelConfigT buildChannelConfigFromModeConfig(
-    int channelIdx, uint16_t noteNumber, const ModeConfig &modeConfig)
+    int channelIdx, uint16_t noteNumber, uint16_t noteNumberB, const ModeConfig &modeConfig)
 {
     midi2pwm::pwm::ChannelConfigT config;
     config.channel_number = static_cast<uint16_t>(channelIdx);
-    config.configuration = midi2pwm::pwm::ChannelConfiguration::FullBridge;
+    config.configuration = static_cast<midi2pwm::pwm::ChannelConfiguration>(modeConfig.configuration);
     config.note = noteNumber;
+    config.note_b = noteNumberB;
     config.min_point = 0.0F;
     config.midpoint = 0.0F;
     config.max_point = 0.0F;

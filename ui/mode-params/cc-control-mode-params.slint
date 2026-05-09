@@ -79,6 +79,7 @@ export component CCControlModeParams inherits VerticalLayout {
     }
 
     spacing: AppStyle.spacing_sm;
+    padding-top: -10px;
 
     Rectangle {
         height: AppStyle.input_height_sm;
@@ -130,10 +131,6 @@ export component CCControlModeParams inherits VerticalLayout {
                 root.is_assigning_cc = false;
             }
         }
-    }
-
-    Rectangle {
-        height: 8px;
     }
 
     SliderWithPopup {

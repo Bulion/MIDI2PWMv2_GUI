@@ -12,6 +12,8 @@ export struct ModeConfig {
     mode_type: int,
     polarity: int,
     release_action: int,
+    configuration: int,
+    note_b: string,
     instant_data: InstantModeData,
     ramped_data: RampedModeData,
     pulse_data: PulseModeData,
@@ -26,14 +28,18 @@ export component ModeSelectionSection inherits VerticalLayout {
         mode_type: 0,
         polarity: 0,
         release_action: 0,
-        instant_data: { on_level: 255, velocity_sensitive: true },
-        ramped_data: { on_level: 255, velocity_sensitive: true, attack_time_ms: 100, release_time_ms: 100 },
-        pulse_data: { on_level: 255, velocity_sensitive: true, attack_time_ms: 10, hold_time_ms: 100, release_time_ms: 50 },
-        toggle_data: { on_level: 255, velocity_sensitive: false, debounce_delay_ms: 50 },
-        adsr_data: { attack_level: 255, sustain_level: 200, velocity_sensitive: true, attack_time_ms: 50, decay_time_ms: 100, release_time_ms: 200 },
-        cc_data: { cc_number: 1, center_value: 64, left_max_pwm: 255, right_max_pwm: 255, deadband_range: 2 },
-        pitchbend_data: { base_level: 128, bend_range: 64, unipolar: false, velocity_sensitive: true },
+        configuration: 0,
+        note_b: "",
+        instant_data: { on_level: 100.0, velocity_sensitive: true },
+        ramped_data: { on_level: 100.0, velocity_sensitive: true, attack_time_ms: 100, release_time_ms: 100 },
+        pulse_data: { on_level: 100.0, velocity_sensitive: true, attack_time_ms: 10, hold_time_ms: 100, release_time_ms: 50 },
+        toggle_data: { on_level: 100.0, velocity_sensitive: false, debounce_delay_ms: 50 },
+        adsr_data: { attack_level: 100.0, sustain_level: 78.4, velocity_sensitive: true, attack_time_ms: 50, decay_time_ms: 100, release_time_ms: 200 },
+        cc_data: { cc_number: 1, center_value: 64, left_max_pwm: 100.0, right_max_pwm: 100.0, deadband_range: 2 },
+        pitchbend_data: { base_level: 50.2, bend_range: 25.1, unipolar: false, velocity_sensitive: true },
     };
+
+    private property <bool> is_half_bridge: root.mode_config.configuration == 1;
 
     in property <float> confirmed_value: -1;
     in property <string> confirmed_field: "";
@@ -48,7 +54,7 @@ export component ModeSelectionSection inherits VerticalLayout {
     alignment: LayoutAlignment.start;
     spacing: AppStyle.spacing_md;
 
-    Text {
+    if !root.is_half_bridge: Text {
         text: "Output Mode";
         font-size: AppStyle.font_size_body;
         color: AppStyle.text_primary;
@@ -56,7 +62,7 @@ export component ModeSelectionSection inherits VerticalLayout {
         height: 24px;
     }
 
-    ComboBox {
+    if !root.is_half_bridge: ComboBox {
         height: 30px;
         model: ["Instant On/Off", "Ramped On/Off", "Timed Pulse", "Toggle", "ADSR Envelope", "CC Control", "Pitch Bend"];
         current-index: root.mode_config.mode_type;
@@ -80,11 +86,11 @@ export component ModeSelectionSection inherits VerticalLayout {
         }
     }
 
-    HorizontalLayout {
-        spacing: AppStyle.spacing_md;
+    if !root.is_half_bridge: HorizontalLayout {
+        spacing: AppStyle.spacing_xs;
         height: 54px;
 
-        if root.mode_config.mode_type != 5: VerticalLayout {
+        VerticalLayout {
             spacing: AppStyle.spacing_xs;
             Text {
                 text: "Direction";
@@ -94,6 +100,7 @@ export component ModeSelectionSection inherits VerticalLayout {
             }
             ComboBox {
                 height: 30px;
+                min-width: 0px;
                 model: ["Forward", "Reverse"];
                 current-index: root.mode_config.polarity;
                 selected(val) => {
@@ -117,6 +124,7 @@ export component ModeSelectionSection inherits VerticalLayout {
             }
             ComboBox {
                 height: 30px;
+                min-width: 0px;
                 model: ["Active Brake", "Free Float"];
                 current-index: root.mode_config.release_action;
                 selected(val) => {
@@ -131,7 +139,7 @@ export component ModeSelectionSection inherits VerticalLayout {
         }
     }
 
-    Text {
+    if !root.is_half_bridge: Text {
         text: "Parameters";
         font-size: AppStyle.font_size_body;
         color: AppStyle.text_primary;
@@ -139,7 +147,7 @@ export component ModeSelectionSection inherits VerticalLayout {
         height: 24px;
     }
 
-    Rectangle {
+    if !root.is_half_bridge: Rectangle {
         background: AppStyle.bg_dialog;
 
         VerticalLayout {
@@ -243,6 +251,20 @@ export component ModeSelectionSection inherits VerticalLayout {
                     root.mode_changed();
                 }
             }
+        }
+    }
+
+    if root.is_half_bridge: Rectangle {
+        vertical-stretch: 1;
+
+        Text {
+            text: "Output modes not supported\nin half-bridge mode";
+            color: AppStyle.text_disabled;
+            font-size: AppStyle.font_size_body;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            width: 100%;
+            height: 100%;
         }
     }
 }

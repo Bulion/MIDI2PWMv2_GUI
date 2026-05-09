@@ -39,6 +39,8 @@ int main()
 
     std::atomic<bool> isAssigningNote{false};
     std::atomic<int> channelAwaitingNote{-1};
+    std::atomic<bool> isAssigningNoteB{false};
+    std::atomic<int> channelAwaitingNoteB{-1};
     std::atomic<bool> isAssigningCc{false};
 
     std::atomic<uint32_t> portsVersion{0};
@@ -130,7 +132,12 @@ int main()
         if (!noteStr.empty()) {
             noteNumber = gui::common::parseNoteString(std::string{noteStr});
         }
-        auto config = gui::common::buildChannelConfigFromModeConfig(channelIdx, noteNumber, modeConfig);
+        uint16_t noteNumberB = 255;
+        std::string noteBStr{modeConfig.note_b};
+        if (!noteBStr.empty()) {
+            noteNumberB = gui::common::parseNoteString(noteBStr);
+        }
+        auto config = gui::common::buildChannelConfigFromModeConfig(channelIdx, noteNumber, noteNumberB, modeConfig);
         commLoop.post(gui::common::CommLoop::SendConfigCmd{std::move(config)});
     });
 
@@ -145,6 +152,20 @@ int main()
         app->set_temp_is_assigning(false);
         app->set_temp_popup_dirty(true);
     });
+
+    app->on_assign_note_b_clicked([&isAssigningNoteB, &channelAwaitingNoteB](int channel_idx) {
+        GUI_LOG_INFO("Assignment", "Entering note B assignment mode for channel %d", channel_idx);
+        isAssigningNoteB.store(true);
+        channelAwaitingNoteB.store(channel_idx);
+    });
+
+    app->on_note_b_assigned_from_backend([app](slint::SharedString note_str) {
+        app->set_temp_note_b(note_str);
+        app->set_temp_is_assigning_b(false);
+        app->set_temp_popup_dirty(true);
+    });
+
+    app->on_reset_note_b_clicked([](int) {});
 
     app->on_assign_cc_clicked([&isAssigningCc]() {
         GUI_LOG_INFO("Assignment", "Entering CC assignment mode");
@@ -172,10 +193,14 @@ int main()
         commLoop.post(gui::common::CommLoop::ResetFaultCmd{static_cast<std::uint16_t>(channelIdx)});
     });
 
-    app->on_popup_closed([&isAssigningNote, &channelAwaitingNote, &isAssigningCc, app]() {
+    app->on_popup_closed([&isAssigningNote, &channelAwaitingNote, &isAssigningNoteB, &channelAwaitingNoteB, &isAssigningCc, app]() {
         if (isAssigningNote.load()) {
             isAssigningNote.store(false);
             channelAwaitingNote.store(-1);
+        }
+        if (isAssigningNoteB.load()) {
+            isAssigningNoteB.store(false);
+            channelAwaitingNoteB.store(-1);
         }
         if (isAssigningCc.load()) {
             isAssigningCc.store(false);
@@ -254,6 +279,17 @@ int main()
                     if (channelIdx >= 0) {
                         std::string noteName = gui::common::midiNoteToString(static_cast<uint16_t>(rawMsg.data1));
                         app->invoke_note_assigned_from_backend(slint::SharedString{noteName.c_str()});
+                    }
+                }
+            } else if (isAssigningNoteB.load()) {
+                bool isNoteMessage = (rawMsg.message_type == midi2pwm::midi::ChannelMessageType::NoteOn ||
+                                      rawMsg.message_type == midi2pwm::midi::ChannelMessageType::NoteOff);
+                if (isNoteMessage && rawMsg.data1 <= 127) {
+                    int channelIdx = channelAwaitingNoteB.exchange(-1);
+                    isAssigningNoteB.store(false);
+                    if (channelIdx >= 0) {
+                        std::string noteName = gui::common::midiNoteToString(static_cast<uint16_t>(rawMsg.data1));
+                        app->invoke_note_b_assigned_from_backend(slint::SharedString{noteName.c_str()});
                     }
                 }
             } else if (isAssigningCc.load()) {

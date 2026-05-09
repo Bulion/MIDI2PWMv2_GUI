@@ -47,23 +47,37 @@ void ChannelTelemetryViewModel::updateFromBatchTelemetry(const midi2pwm::pwm::Ba
             float newVoltage = telemetry->voltage();
             float newCurrentMa = telemetry->current() * 1000.0F;
             bool newIsActive = (telemetry->status() == midi2pwm::pwm::ChannelStatus::Active);
-            auto newFault = statusToString(telemetry->status(), telemetry->had_fault());
+            bool newHasFault = (telemetry->status() == midi2pwm::pwm::ChannelStatus::Fault) || telemetry->had_fault();
             float newDutyCycle = telemetry->duty_cycle() * 100.0F;
             int newPolarity = static_cast<int>(telemetry->polarity());
+            int newConfiguration = static_cast<int>(telemetry->configuration());
+            auto newNoteB = midiNoteToString(telemetry->note_b());
+            int newNoteNumberB = static_cast<int>(telemetry->note_b());
+            bool newIsActiveA = (telemetry->status_a() == midi2pwm::pwm::ChannelStatus::Active);
+            bool newIsActiveB = (telemetry->status_b() == midi2pwm::pwm::ChannelStatus::Active);
 
             if (channelData.voltage != newVoltage
                 || channelData.currentMa != newCurrentMa
                 || channelData.isActive != newIsActive
-                || channelData.fault != newFault
+                || channelData.hasFault != newHasFault
                 || channelData.dutyCyclePercent != newDutyCycle
-                || channelData.polarity != newPolarity) {
+                || channelData.polarity != newPolarity
+                || channelData.configuration != newConfiguration
+                || channelData.noteB != newNoteB
+                || channelData.isActiveA != newIsActiveA
+                || channelData.isActiveB != newIsActiveB) {
 
                 channelData.voltage = newVoltage;
                 channelData.currentMa = newCurrentMa;
                 channelData.isActive = newIsActive;
-                channelData.fault = newFault;
+                channelData.hasFault = newHasFault;
                 channelData.dutyCyclePercent = newDutyCycle;
                 channelData.polarity = newPolarity;
+                channelData.configuration = newConfiguration;
+                channelData.noteB = newNoteB;
+                channelData.noteNumberB = newNoteNumberB;
+                channelData.isActiveA = newIsActiveA;
+                channelData.isActiveB = newIsActiveB;
                 channelDirty_[channelNumber] = true;
             }
         }
@@ -103,6 +117,9 @@ void ChannelTelemetryViewModel::applyConfigToChannel(const midi2pwm::pwm::Channe
     ChannelData &channelData = channels_[channelNumber];
     channelData.note = midiNoteToString(config.note());
     channelData.noteNumber = static_cast<int>(config.note());
+    channelData.configuration = static_cast<int>(config.configuration());
+    channelData.noteB = midiNoteToString(config.note_b());
+    channelData.noteNumberB = static_cast<int>(config.note_b());
     channelData.mode_type = static_cast<std::uint8_t>(config.output_mode());
     channelData.polarity = static_cast<int>(config.polarity());
     channelData.release_action = static_cast<int>(config.release_action());
@@ -248,10 +265,15 @@ void ChannelTelemetryViewModel::clear()
             channelData.currentMa = 0.0F;
             channelData.dutyCyclePercent = 0.0F;
             channelData.isActive = false;
-            channelData.fault = "";
+            channelData.hasFault = false;
             channelData.mode_type = 0;
             channelData.polarity = 0;
             channelData.release_action = 0;
+            channelData.configuration = 0;
+            channelData.noteB = "---";
+            channelData.noteNumberB = 255;
+            channelData.isActiveA = false;
+            channelData.isActiveB = false;
             channelData.instant_data = {100.0F, true};
             channelData.ramped_data = {100.0F, true, 100, 100};
             channelData.pulse_data = {100.0F, true, 10, 100, 50};
@@ -341,26 +363,6 @@ etl::string<16> ChannelTelemetryViewModel::midiNoteToString(std::uint16_t noteNu
     }
 
     return result;
-}
-
-etl::string<32> ChannelTelemetryViewModel::statusToString(midi2pwm::pwm::ChannelStatus status, bool hadFault)
-{
-    if (status == midi2pwm::pwm::ChannelStatus::Fault) {
-        return "FAULT";
-    }
-
-    if (hadFault) {
-        return "HAD_FAULT";
-    }
-
-    switch (status) {
-    case midi2pwm::pwm::ChannelStatus::Active:
-        return "Active";
-    case midi2pwm::pwm::ChannelStatus::Inactive:
-        return "Inactive";
-    default:
-        return "";
-    }
 }
 
 } // namespace gui::common

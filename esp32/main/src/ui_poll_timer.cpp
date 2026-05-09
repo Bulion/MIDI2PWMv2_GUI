@@ -87,7 +87,9 @@ void startUiPollTimer(slint::ComponentHandle<AppWindow> app,
             telVm.clearGlobalDirty();
         }
 
-        lastTelVersion = telVm.version();
+        if (!otaRebootWaitingForReconnect) {
+            lastTelVersion = telVm.version();
+        }
 
         uint32_t midiVer = midiVm.version();
         if (midiVer != lastMidiVersion) {
@@ -107,6 +109,17 @@ void startUiPollTimer(slint::ComponentHandle<AppWindow> app,
                     if (channelIdx >= 0) {
                         std::string noteName = gui::common::midiNoteToString(static_cast<uint16_t>(rawMsg.data1));
                         app->invoke_note_assigned_from_backend(slint::SharedString{noteName.c_str()});
+                    }
+                }
+            } else if (assignState.isAssigningNoteB.load()) {
+                bool isNoteMessage = (rawMsg.message_type == midi2pwm::midi::ChannelMessageType::NoteOn ||
+                                      rawMsg.message_type == midi2pwm::midi::ChannelMessageType::NoteOff);
+                if (isNoteMessage && rawMsg.data1 <= 127) {
+                    int channelIdx = assignState.channelAwaitingNoteB.exchange(-1);
+                    assignState.isAssigningNoteB.store(false);
+                    if (channelIdx >= 0) {
+                        std::string noteName = gui::common::midiNoteToString(static_cast<uint16_t>(rawMsg.data1));
+                        app->invoke_note_b_assigned_from_backend(slint::SharedString{noteName.c_str()});
                     }
                 }
             } else if (assignState.isAssigningCc.load()) {
