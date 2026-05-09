@@ -1,0 +1,26 @@
+import { CheckBox } from "std-widgets.slint";
+import { AppStyle } from "../style.slint";
+
+export component StyledCheckbox inherits HorizontalLayout {
+    in-out property <bool> checked: false;
+    in property <string> label: "";
+
+    callback toggled;
+
+    spacing: AppStyle.spacing_xs;
+    alignment: LayoutAlignment.start;
+
+    CheckBox {
+        checked <=> root.checked;
+        toggled => {
+            root.toggled();
+        }
+    }
+
+    Text {
+        text: root.label;
+        color: AppStyle.text_secondary;
+        font-size: AppStyle.font_size_small;
+        vertical-alignment: center;
+    }
+}

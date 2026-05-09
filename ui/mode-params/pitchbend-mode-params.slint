@@ -1,5 +1,5 @@
-import { CheckBox } from "std-widgets.slint";
 import { SliderWithPopup } from "../slider-with-popup.slint";
+import { StyledCheckbox } from "../components/styled_checkbox.slint";
 import { AppStyle } from "../style.slint";
 
 export struct PitchBendModeData {
@@ -104,8 +104,8 @@ export component PitchBendModeParams inherits VerticalLayout {
         }
     }
 
-    CheckBox {
-        text: "Unipolar Mode";
+    StyledCheckbox {
+        label: "Unipolar Mode";
         checked: root.data.unipolar;
         toggled => {
             root.data.unipolar = self.checked;
@@ -113,8 +113,8 @@ export component PitchBendModeParams inherits VerticalLayout {
         }
     }
 
-    CheckBox {
-        text: "Velocity Sensitive";
+    StyledCheckbox {
+        label: "Velocity Sensitive";
         checked: root.data.velocity_sensitive;
         toggled => {
             root.data.velocity_sensitive = self.checked;

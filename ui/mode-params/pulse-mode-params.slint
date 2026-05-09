@@ -1,5 +1,5 @@
-import { CheckBox } from "std-widgets.slint";
 import { SliderWithPopup } from "../slider-with-popup.slint";
+import { StyledCheckbox } from "../components/styled_checkbox.slint";
 import { AppStyle } from "../style.slint";
 
 export struct PulseModeData {
@@ -98,8 +98,8 @@ export component PulseModeParams inherits VerticalLayout {
         }
     }
 
-    CheckBox {
-        text: "Velocity Sensitive";
+    StyledCheckbox {
+        label: "Velocity Sensitive";
         checked: root.data.velocity_sensitive;
         toggled => {
             root.data.velocity_sensitive = self.checked;
